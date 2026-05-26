@@ -4,25 +4,52 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["frontend/src/*"],
-      "@theme/*": ["frontend/src/theme/*"],
-      "@components/*": ["frontend/src/components/*"],
-      "@screens/*": ["frontend/src/screens/*"],
-      "@navigation/*": ["frontend/src/navigation/*"],
-      "@services/*": ["frontend/src/services/*"],
-      "@store/*": ["frontend/src/store/*"],
-      "@hooks/*": ["frontend/src/hooks/*"],
-      "@utils/*": ["frontend/src/utils/*"],
-      "@constants/*": ["frontend/src/constants/*"],
-      "@types/*": ["frontend/src/types/*"],
-      "@validations/*": ["frontend/src/validations/*"],
-      "@assets/*": ["frontend/src/assets/*"]
+      "@/*": [
+        "frontend/src/*"
+      ],
+      "@theme/*": [
+        "frontend/src/theme/*"
+      ],
+      "@components/*": [
+        "frontend/src/components/*"
+      ],
+      "@screens/*": [
+        "frontend/src/screens/*"
+      ],
+      "@navigation/*": [
+        "frontend/src/navigation/*"
+      ],
+      "@services/*": [
+        "frontend/src/services/*"
+      ],
+      "@store/*": [
+        "frontend/src/store/*"
+      ],
+      "@hooks/*": [
+        "frontend/src/hooks/*"
+      ],
+      "@utils/*": [
+        "frontend/src/utils/*"
+      ],
+      "@constants/*": [
+        "frontend/src/constants/*"
+      ],
+      "@types/*": [
+        "frontend/src/types/*"
+      ],
+      "@validations/*": [
+        "frontend/src/validations/*"
+      ],
+      "@assets/*": [
+        "frontend/src/assets/*"
+      ]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.d.ts",
-    "expo-env.d.ts"
+    "expo-env.d.ts",
+    ".expo/types/**/*.ts"
   ]
 }

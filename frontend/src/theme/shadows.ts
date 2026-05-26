@@ -47,4 +47,7 @@ export const Shadows = {
 
   // Sombra para FAB
   fab: createShadow('#0B8F3A', { width: 0, height: 6 }, 0.30, 16, 12),
+
+  // Sombra para tab bar inferior
+  tabBar: createShadow('#064E2E', { width: 0, height: -2 }, 0.08, 8, 8),
 } as const;
