@@ -115,4 +115,82 @@ export const chartsService = {
       free_vs_goals: { free, goals },
     };
   },
+
+  /**
+   * Ahorro mensual resumido (últimos N meses)
+   */
+  async getMonthlySavings(months = 6): Promise<{ month: string; total: number }[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const fromDate = new Date();
+    fromDate.setMonth(fromDate.getMonth() - (months - 1));
+    fromDate.setDate(1);
+
+    const { data } = await supabase
+      .from('savings')
+      .select('amount, date')
+      .eq('user_id', user.id)
+      .gte('date', fromDate.toISOString().split('T')[0])
+      .order('date', { ascending: true });
+
+    const map = new Map<string, number>();
+    (data ?? []).forEach((s) => {
+      const key = s.date.substring(0, 7);
+      map.set(key, (map.get(key) ?? 0) + s.amount);
+    });
+
+    return Array.from(map.entries())
+      .sort()
+      .map(([month, total]) => ({ month, total }));
+  },
+
+  /**
+   * Distribución por moneda (total + porcentaje)
+   */
+  async getCurrencyDistribution(): Promise<{ currency: string; total: number; percentage: number }[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data } = await supabase
+      .from('savings')
+      .select('amount, currency')
+      .eq('user_id', user.id);
+
+    const map = new Map<string, number>();
+    (data ?? []).forEach((s) => {
+      map.set(s.currency, (map.get(s.currency) ?? 0) + s.amount);
+    });
+
+    const totalAll = Array.from(map.values()).reduce((a, b) => a + b, 0);
+    return Array.from(map.entries()).map(([currency, total]) => ({
+      currency,
+      total,
+      percentage: totalAll > 0 ? (total / totalAll) * 100 : 0,
+    }));
+  },
+
+  /**
+   * Crecimiento acumulado (últimos N días)
+   */
+  async getCumulativeGrowth(days = 90): Promise<{ date: string; cumulative: number }[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - days);
+
+    const { data } = await supabase
+      .from('savings')
+      .select('amount, date')
+      .eq('user_id', user.id)
+      .gte('date', fromDate.toISOString().split('T')[0])
+      .order('date', { ascending: true });
+
+    let cumulative = 0;
+    return (data ?? []).map((s) => {
+      cumulative += s.amount;
+      return { date: s.date, cumulative };
+    });
+  },
 };
