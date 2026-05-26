@@ -1,0 +1,39 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Ejecutar cada 2 días a las 08:00 UTC
+    - cron: '0 8 */2 * *'
+  workflow_dispatch: # Permite ejecución manual
+
+jobs:
+  keepalive:
+    name: Ping Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping Supabase (query ligera)
+        run: |
+          echo "🟢 ProAhorro — Ejecutando keep-alive para Supabase Free..."
+
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 15 \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/currencies?select=code&is_system=eq.true&limit=1")
+
+          echo "HTTP Status: $RESPONSE"
+
+          if [ "$RESPONSE" -eq 200 ] || [ "$RESPONSE" -eq 406 ]; then
+            echo "✅ Supabase respondió correctamente. Proyecto activo."
+          else
+            echo "⚠️ Respuesta inesperada: $RESPONSE"
+            exit 1
+          fi
+
+      - name: Log resultado
+        if: always()
+        run: |
+          echo "Fecha de ejecución: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Proyecto: ProAhorro — com.proahorro.app"

@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "ProAhorro",
+    "slug": "proahorro",
+    "scheme": "proahorro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./frontend/src/assets/images/imglogo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./frontend/src/assets/images/imglogo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#064E2E"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.proahorro.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "ProAhorro usa Face ID para proteger el acceso a tus datos de ahorro si decides activar esta función.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./frontend/src/assets/images/imglogo.png",
+        "backgroundColor": "#064E2E"
+      },
+      "package": "com.proahorro.app",
+      "versionCode": 1,
+      "permissions": []
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./frontend/src/assets/images/imglogo.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "root": "./frontend/app"
+        }
+      ],
+      "expo-font",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "ProAhorro usa Face ID para proteger el acceso a tus datos de ahorro."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          },
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      }
+    }
+  }
+}
