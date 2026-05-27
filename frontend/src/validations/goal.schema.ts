@@ -28,8 +28,8 @@ export const createGoalSchema = z.object({
       const date = new Date(val);
       return date > new Date();
     }, 'La fecha límite debe ser en el futuro'),
-  icon: z.string().default('wallet'),
-  color: z.string().default('#0B8F3A'),
+  icon: z.string(),
+  color: z.string(),
 });
 
 export const updateGoalSchema = createGoalSchema.partial().extend({

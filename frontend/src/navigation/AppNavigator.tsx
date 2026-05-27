@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, FontFamily, FontSize, Spacing, Shadows } from '../../theme';
+import { Colors, FontFamily, FontSize, Spacing, Shadows } from '../theme';
 
 // Pantallas
 import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
@@ -20,7 +20,7 @@ import { CreateGoalScreen } from '../screens/goals/CreateGoalScreen';
 import { PrivacySecurityScreen } from '../screens/account/PrivacySecurityScreen';
 import { DeleteAccountScreen } from '../screens/account/DeleteAccountScreen';
 import { CurrencySettingsScreen } from '../screens/account/CurrencySettingsScreen';
-import type { Goal, Saving } from '../../types';
+import type { Goal, Saving } from '../types';
 
 type Tab = 'dashboard' | 'goals' | 'history' | 'charts' | 'account';
 type ModalScreen =

@@ -22,7 +22,7 @@ interface CreateGoalScreenProps {
 export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({ onBack, onSuccess }) => {
   const { createGoal } = useGoalsStore();
   const [selectedIcon, setSelectedIcon] = useState('wallet');
-  const [selectedColor, setSelectedColor] = useState(Colors.primary);
+  const [selectedColor, setSelectedColor] = useState<string>(Colors.primary);
 
   const { control, handleSubmit, formState: { errors, isSubmitting } } =
     useForm<CreateGoalFormData>({
