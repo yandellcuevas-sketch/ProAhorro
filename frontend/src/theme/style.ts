@@ -1,7 +1,7 @@
 // ============================================================
 //  AhorroPro — Sistema de Diseño Completo
 //  Un solo archivo. Importa lo que necesites.
-//  Uso: import { S, Layout, Theme } from '../../theme/styles';
+//  Uso: import { S, Layout, Theme } from '../../theme/style';
 // ============================================================
 
 import { StyleSheet, Dimensions, Platform } from 'react-native';
@@ -1652,7 +1652,7 @@ export const DeleteAccount = StyleSheet.create({
 
 // ─────────────────────────────────────────────────────────────
 //  EXPORT AGRUPADO — Importa solo lo que necesites
-//  import { S } from '../../theme/styles'
+//  import { S } from '../../theme/style'
 //  <View style={S.Cards.basePad}>
 //  <Text style={S.Typography.amountHero}>
 //  <TouchableOpacity style={S.Buttons.primary}>
