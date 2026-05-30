@@ -1,0 +1,53 @@
+# codemagic.yaml — Configuración de CI/CD para ProAhorro (iOS Ad Hoc)
+
+workflows:
+  ios-ad-hoc:
+    name: ProAhorro iOS Ad Hoc Build
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    
+    environment:
+      groups:
+        - proahorro_env # Grupo de variables que crearás en el panel de Codemagic
+      node: v22.11.0
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: ad_hoc
+        bundle_identifier: com.proahorro.app
+        
+    scripts:
+      - name: Initialize keychain and code signing
+        script: |
+          keychain initialize
+          xcode-project use-profiles
+          
+      - name: Generate .env file
+        script: |
+          echo "EXPO_PUBLIC_SUPABASE_URL=$EXPO_PUBLIC_SUPABASE_URL" > .env
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$EXPO_PUBLIC_SUPABASE_ANON_KEY" >> .env
+          echo "APP_ENV=$APP_ENV" >> .env
+          echo "APPLE_ID=$APPLE_ID" >> .env
+          echo "APPLE_TEAM_ID=$APPLE_TEAM_ID" >> .env
+          echo "ASC_APP_ID=$ASC_APP_ID" >> .env
+          echo "SUPABASE_URL=$SUPABASE_URL" >> .env
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env
+          
+      - name: Install dependencies
+        script: |
+          npm install --legacy-peer-deps
+          
+      - name: Expo prebuild
+        script: |
+          npx expo prebuild --platform ios --clean
+          
+      - name: CocoaPods Install
+        script: |
+          cd ios && pod install
+          
+      - name: Build signed IPA
+        script: |
+          xcode-project build-ipa --workspace "ios/ProAhorro.xcworkspace" --scheme "ProAhorro"
+          
+    artifacts:
+      - build/ios/ipa/*.ipa
