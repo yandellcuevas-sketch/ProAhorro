@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet,
-  Pressable, StatusBar, Alert,
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  StatusBar,
+  Alert,
+  Animated,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
-import { Colors, FontFamily, FontSize, Spacing, BorderRadius, Shadows } from '../../theme';
+import { S, Theme } from '../../theme/style';
 import { accountService } from '../../services/accountService';
 import { useAuthStore } from '../../store/authStore';
 
@@ -29,6 +34,17 @@ export const CurrencySettingsScreen: React.FC<CurrencySettingsScreenProps> = ({ 
   const [selected, setSelected] = useState(user?.main_currency ?? 'DOP');
   const [saving, setSaving] = useState(false);
 
+  // Animaciones de entrada
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, friction: 9, tension: 55, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -45,88 +61,111 @@ export const CurrencySettingsScreen: React.FC<CurrencySettingsScreenProps> = ({ 
   };
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={[Colors.primaryDeep, Colors.primaryDark]} style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={onBack}>
-          <Ionicons name="arrow-back" size={24} color={Colors.white} />
+    <View style={S.Layout.screen}>
+      <StatusBar barStyle="light-content" backgroundColor={Theme.color.primaryDarker} />
+      
+      {/* Header con gradiente */}
+      <LinearGradient
+        colors={[Theme.color.primaryDarker, Theme.color.primaryDark]}
+        style={{
+          paddingTop: Platform.OS === 'ios' ? 52 : 40,
+          paddingBottom: 28,
+          paddingHorizontal: Theme.space.md,
+          gap: 4,
+        }}
+      >
+        <Pressable
+          style={[
+            S.Layout.backBtn,
+            {
+              marginBottom: Theme.space.sm,
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              borderColor: 'rgba(255,255,255,0.2)',
+            },
+          ]}
+          onPress={onBack}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={22} color={Theme.color.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>Moneda principal</Text>
-        <Text style={styles.headerSub}>Selecciona tu moneda de referencia</Text>
+        <Text style={[S.Typography.headingLg, { color: Theme.color.white }]}>Moneda principal</Text>
+        <Text style={[S.Typography.bodyMd, { color: 'rgba(255,255,255,0.7)' }]}>
+          Selecciona tu moneda de referencia
+        </Text>
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.explanation}>
-          La moneda principal se usa para mostrar el total ahorrado en el dashboard. Puedes tener ahorros en múltiples monedas.
-        </Text>
-
-        <View style={styles.currencyList}>
-          {CURRENCIES.map((c) => (
-            <Pressable
-              key={c.code}
-              style={({ pressed }) => [
-                styles.currencyRow,
-                selected === c.code && styles.currencyRowSelected,
-                pressed && styles.currencyRowPressed,
-              ]}
-              onPress={() => setSelected(c.code)}
-            >
-              <Text style={styles.flag}>{c.flag}</Text>
-              <View style={styles.currencyInfo}>
-                <Text style={[styles.currencyName, selected === c.code && styles.currencyNameSelected]}>
-                  {c.name}
-                </Text>
-                <Text style={styles.currencyCode}>{c.code} · {c.symbol}</Text>
-              </View>
-              {selected === c.code && (
-                <View style={styles.checkmark}>
-                  <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
-                </View>
-              )}
-            </Pressable>
-          ))}
-        </View>
-
-        <View style={styles.note}>
-          <Ionicons name="information-circle-outline" size={16} color={Colors.primary} />
-          <Text style={styles.noteText}>
-            Puedes agregar ahorros en cualquier moneda independientemente de tu moneda principal.
+      <ScrollView contentContainerStyle={S.Layout.scrollPad} showsVerticalScrollIndicator={false}>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], gap: Theme.space.md }}>
+          <Text style={[S.Typography.bodyLg, { color: Theme.color.textMedium, lineHeight: 22, marginBottom: Theme.space.xs }]}>
+            La moneda principal se usa para mostrar el total ahorrado en el dashboard. Puedes tener ahorros en múltiples monedas.
           </Text>
-        </View>
 
-        <Button
-          label="Guardar moneda"
-          variant="primary"
-          loading={saving}
-          onPress={handleSave}
-          style={styles.saveBtn}
-          disabled={selected === user?.main_currency}
-        />
-        <View style={{ height: 40 }} />
+          {/* Lista de monedas en listSection */}
+          <View style={S.Cards.listSection}>
+            {CURRENCIES.map((c, i) => {
+              const isSelected = selected === c.code;
+              return (
+                <Pressable
+                  key={c.code}
+                  style={({ pressed }) => [
+                    S.ListItems.row,
+                    i < CURRENCIES.length - 1 && S.ListItems.rowBorder,
+                    isSelected && { backgroundColor: Theme.color.primaryLighter },
+                    pressed && { backgroundColor: Theme.color.gray100 },
+                  ]}
+                  onPress={() => setSelected(c.code)}
+                >
+                  <Text style={{ fontSize: 28 }}>{c.flag}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        S.ListItems.rowLabel,
+                        isSelected && { color: Theme.color.primary, fontFamily: Theme.font.soraSemiBold },
+                      ]}
+                    >
+                      {c.name}
+                    </Text>
+                    <Text style={S.ListItems.rowSublabel}>
+                      {c.code} · {c.symbol}
+                    </Text>
+                  </View>
+                  {isSelected && (
+                    <MaterialCommunityIcons name="check-circle" size={24} color={Theme.color.primary} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Banner de información */}
+          <View
+            style={[
+              S.Cards.base,
+              {
+                flexDirection: 'row',
+                gap: Theme.space.sm,
+                backgroundColor: Theme.color.primaryLighter,
+                borderRadius: Theme.radius.md,
+                padding: Theme.space.md,
+                borderWidth: 1,
+                borderColor: Theme.color.primaryLight,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons name="information-outline" size={18} color={Theme.color.primary} />
+            <Text style={[S.Typography.bodySm, { flex: 1, color: Theme.color.primaryDark, lineHeight: 18 }]}>
+              Puedes agregar ahorros en cualquier moneda independientemente de tu moneda principal.
+            </Text>
+          </View>
+
+          <Button
+            label="Guardar moneda"
+            variant="primary"
+            loading={saving}
+            onPress={handleSave}
+            disabled={selected === user?.main_currency}
+          />
+        </Animated.View>
       </ScrollView>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.backgroundMain },
-  header: { paddingTop: 60, paddingBottom: 28, paddingHorizontal: Spacing.screenHorizontal, gap: 4 },
-  backBtn: { marginBottom: Spacing[3] },
-  headerTitle: { fontFamily: FontFamily.soraBold, fontSize: FontSize.xl, color: Colors.white },
-  headerSub: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.7)' },
-  content: { padding: Spacing.screenHorizontal, paddingTop: Spacing[5] },
-  explanation: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.base, color: Colors.textMedium, lineHeight: FontSize.base * 1.5, marginBottom: Spacing[5] },
-  currencyList: { backgroundColor: Colors.white, borderRadius: BorderRadius.card, overflow: 'hidden', ...Shadows.sm, marginBottom: Spacing[4] },
-  currencyRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing[4], gap: Spacing[3], borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  currencyRowSelected: { backgroundColor: Colors.primarySoft },
-  currencyRowPressed: { backgroundColor: Colors.backgroundMain },
-  flag: { fontSize: 28 },
-  currencyInfo: { flex: 1 },
-  currencyName: { fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.base, color: Colors.textDark },
-  currencyNameSelected: { color: Colors.primary, fontFamily: FontFamily.dmSansSemiBold },
-  currencyCode: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.xs, color: Colors.textLight, marginTop: 2 },
-  checkmark: {},
-  note: { flexDirection: 'row', gap: Spacing[2], backgroundColor: Colors.primarySoft, borderRadius: BorderRadius.md, padding: Spacing[4], borderWidth: 1, borderColor: Colors.primaryLight, marginBottom: Spacing[4] },
-  noteText: { flex: 1, fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: Colors.primaryDeep, lineHeight: FontSize.sm * 1.5 },
-  saveBtn: {},
-});

@@ -1,213 +1,190 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
-  ScrollView,
-  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  StatusBar,
+  Animated,
   KeyboardAvoidingView,
   Platform,
-  Alert,
-  StatusBar,
+  ScrollView,
+  Image,
 } from 'react-native';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { AnimatedLogo } from '../../components/brand/AnimatedLogo';
-import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '../../theme';
-import { loginSchema, type LoginFormData } from '../../validations/auth.schema';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { S, Theme } from '../../theme/style';
 import { useAuthStore } from '../../store/authStore';
 
-interface LoginScreenProps {
-  onNavigateToRegister: () => void;
-  onNavigateToForgotPassword: () => void;
-  onLoginSuccess: () => void;
-}
+const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({
-  onNavigateToRegister,
-  onNavigateToForgotPassword,
-  onLoginSuccess,
-}) => {
   const { login, isLoading } = useAuthStore();
   const [submitError, setSubmitError] = useState('');
 
-  const { control, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
-  });
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
-  const onSubmit = async (data: LoginFormData) => {
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 50, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setSubmitError('Por favor ingresa tu correo y contraseña');
+      return;
+    }
     setSubmitError('');
     try {
-      await login(data.email, data.password);
-      onLoginSuccess();
+      await login(email, password);
     } catch (err: any) {
-      setSubmitError(err.message);
+      setSubmitError(err.message || 'Error al iniciar sesión');
     }
   };
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient
-        colors={[Colors.primaryDeep, Colors.primaryDark, Colors.primary]}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+    <KeyboardAvoidingView
+      style={S.Layout.screenWhite}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor={Theme.color.bgCard} />
+      <ScrollView
+        contentContainerStyle={[S.Layout.scrollPadLg, { paddingTop: 64 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <AnimatedLogo showTagline={false} size={72} />
-        <Text style={styles.headerTitle}>ProAhorro</Text>
-        <Text style={styles.headerSubtitle}>Bienvenido de vuelta</Text>
-      </LinearGradient>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.body}
-      >
-        <ScrollView
-          contentContainerStyle={styles.form}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.title}>Iniciar sesión</Text>
-          <Text style={styles.subtitle}>Ingresa para ver tus ahorros</Text>
+          {/* Logo */}
+          <View style={[S.Buttons.iconCircleGreen, { width: 56, height: 56, borderRadius: 16, marginBottom: Theme.space.xl }]}>
+            <Image
+              source={require('../../assets/images/imglogo.png')}
+              style={{ width: 32, height: 32, tintColor: Theme.color.white }}
+              resizeMode="contain"
+            />
+          </View>
 
+          <Text style={[S.Typography.displayMd, { marginBottom: 4 }]}>
+            {'Bienvenido de\nvuelta'}
+          </Text>
+          <Text style={[S.Typography.bodyLg, { marginBottom: Theme.space.xl }]}>
+            Inicia sesión para ver tus ahorros
+          </Text>
+
+          {/* Error banner */}
           {submitError ? (
-            <View style={styles.errorBanner}>
-              <Text style={styles.errorBannerText}>{submitError}</Text>
+            <View style={[S.Cards.danger, { marginBottom: Theme.space.md, borderLeftWidth: 3, borderLeftColor: Theme.color.danger }]}>
+              <Text style={[S.Typography.danger, { fontSize: Theme.size.sm }]}>{submitError}</Text>
             </View>
           ) : null}
 
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <Input
-                label="Email"
-                placeholder="tu@email.com"
+          {/* Email */}
+          <View style={S.Forms.group}>
+            <Text style={S.Typography.label}>Correo electrónico</Text>
+            <View style={[
+              focusedField === 'email' ? S.Forms.inputWrapFocused : S.Forms.inputWrap,
+            ]}>
+              <MaterialCommunityIcons
+                name="email-outline"
+                size={18}
+                color={focusedField === 'email' ? Theme.color.primary : Theme.color.textPlaceholder}
+              />
+              <TextInput
+                style={S.Forms.input}
+                placeholder="tu@correo.com"
+                placeholderTextColor={Theme.color.textPlaceholder}
+                value={email}
+                onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                autoCorrect={false}
-                leftIcon="mail-outline"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.email?.message}
+                onFocus={() => setFocusedField('email')}
+                onBlur={() => setFocusedField(null)}
               />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <Input
-                label="Contraseña"
-                placeholder="••••••••"
-                isPassword
-                leftIcon="lock-closed-outline"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.password?.message}
-              />
-            )}
-          />
-
-          <Button
-            label="¿Olvidaste tu contraseña?"
-            variant="ghost"
-            size="sm"
-            fullWidth={false}
-            onPress={onNavigateToForgotPassword}
-            style={styles.forgotBtn}
-          />
-
-          <Button
-            label="Entrar"
-            variant="primary"
-            loading={isLoading}
-            onPress={handleSubmit(onSubmit)}
-            style={styles.loginBtn}
-          />
-
-          <View style={styles.registerRow}>
-            <Text style={styles.registerText}>¿No tienes cuenta? </Text>
-            <Button
-              label="Crear cuenta"
-              variant="ghost"
-              size="sm"
-              fullWidth={false}
-              onPress={onNavigateToRegister}
-            />
+            </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+
+          {/* Password */}
+          <View style={S.Forms.group}>
+            <View style={S.Forms.labelRow}>
+              <Text style={S.Typography.label}>Contraseña</Text>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('ForgotPassword')}>
+                <Text style={S.Typography.linkSm}>¿Olvidaste tu contraseña?</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={[
+              focusedField === 'pass' ? S.Forms.inputWrapFocused : S.Forms.inputWrap,
+            ]}>
+              <MaterialCommunityIcons
+                name="lock-outline"
+                size={18}
+                color={focusedField === 'pass' ? Theme.color.primary : Theme.color.textPlaceholder}
+              />
+              <TextInput
+                style={S.Forms.input}
+                placeholder="••••••••"
+                placeholderTextColor={Theme.color.textPlaceholder}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPass}
+                onFocus={() => setFocusedField('pass')}
+                onBlur={() => setFocusedField(null)}
+              />
+              <TouchableOpacity onPress={() => setShowPass(!showPass)} activeOpacity={0.7}>
+                <MaterialCommunityIcons
+                  name={showPass ? 'eye-off-outline' : 'eye-outline'}
+                  size={18}
+                  color={Theme.color.textPlaceholder}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* CTA principal */}
+          <TouchableOpacity
+            style={[S.Buttons.primaryLg, isLoading && S.Buttons.disabled, { marginTop: Theme.space.sm, marginBottom: Theme.space.lg }]}
+            activeOpacity={0.85}
+            onPress={handleLogin}
+            disabled={isLoading}
+          >
+            <Text style={S.Buttons.primaryText}>{isLoading ? 'Iniciando...' : 'Iniciar sesión'}</Text>
+            {!isLoading && <MaterialCommunityIcons name="arrow-right" size={18} color={Theme.color.white} />}
+          </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={S.Forms.dividerRow}>
+            <View style={S.Forms.dividerLine} />
+            <Text style={S.Forms.dividerText}>o continúa con</Text>
+            <View style={S.Forms.dividerLine} />
+          </View>
+
+          {/* Social */}
+          <TouchableOpacity style={[S.Buttons.apple, { marginBottom: Theme.space.sm }]} activeOpacity={0.85}>
+            <MaterialCommunityIcons name="apple" size={20} color={Theme.color.white} />
+            <Text style={S.Buttons.appleText}>Continuar con Apple</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[S.Buttons.google, { marginBottom: Theme.space.xl }]} activeOpacity={0.85}>
+            <MaterialCommunityIcons name="google" size={18} color="#EA4335" />
+            <Text style={S.Buttons.googleText}>Continuar con Google</Text>
+          </TouchableOpacity>
+
+          {/* Footer */}
+          <View style={[S.Layout.row, { justifyContent: 'center' }]}>
+            <Text style={S.Typography.bodyLg}>¿No tienes cuenta?</Text>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Register')}>
+              <Text style={[S.Typography.link, { marginLeft: 4 }]}> Regístrate</Text>
+            </TouchableOpacity>
+          </View>
+
+        </Animated.View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.backgroundMain },
-  header: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingBottom: 40,
-    gap: 8,
-  },
-  headerTitle: {
-    fontFamily: FontFamily.soraBold,
-    fontSize: FontSize['2xl'],
-    color: Colors.white,
-  },
-  headerSubtitle: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.base,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  body: { flex: 1 },
-  form: {
-    padding: Spacing.screenHorizontal,
-    paddingTop: Spacing[6],
-  },
-  title: {
-    fontFamily: FontFamily.soraSemiBold,
-    fontSize: FontSize.xl,
-    color: Colors.textDark,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.base,
-    color: Colors.textMedium,
-    marginBottom: Spacing[6],
-  },
-  errorBanner: {
-    backgroundColor: Colors.dangerLight,
-    borderRadius: BorderRadius.sm,
-    padding: Spacing[3],
-    marginBottom: Spacing[4],
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.danger,
-  },
-  errorBannerText: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.sm,
-    color: Colors.danger,
-  },
-  forgotBtn: { alignSelf: 'flex-end', marginTop: -Spacing[2], marginBottom: Spacing[4] },
-  loginBtn: { marginTop: Spacing[2] },
-  registerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing[4],
-  },
-  registerText: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.base,
-    color: Colors.textMedium,
-  },
-});
+export default LoginScreen;

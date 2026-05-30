@@ -18,6 +18,13 @@ export const Spacing = {
   14: 56,
   16: 64,
 
+  // Shortcuts
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+
   // Semánticos
   screenHorizontal: 20,
   screenVertical: 24,

@@ -1,18 +1,41 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, Pressable,
-  Alert, StatusBar, ActivityIndicator,
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Alert,
+  StatusBar,
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Colors, FontFamily, FontSize, Spacing, BorderRadius, Shadows } from '../../theme';
+import { S, Theme } from '../../theme/style';
 import { useGoalsStore } from '../../store/goalsStore';
 import { goalsService } from '../../services/goalsService';
-import { formatAmount, formatDate } from '../../utils/format';
 import type { Goal } from '../../types';
+
+// Helper local para formateo
+const formatAmount = (amount: number, currency: string) => {
+  const symbols: Record<string, string> = { DOP: 'RD$', USD: '$', EUR: '€' };
+  const symbol = symbols[currency] ?? currency;
+  return `${symbol}${amount.toLocaleString('es-DO', { minimumFractionDigits: 0 })}`;
+};
+
+const formatDate = (dateString?: string) => {
+  if (!dateString) return '';
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return dateString;
+    return d.toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch {
+    return dateString;
+  }
+};
 
 interface GoalDetailScreenProps {
   goal: Goal;
@@ -27,12 +50,26 @@ export const GoalDetailScreen: React.FC<GoalDetailScreenProps> = ({
   onEdit,
   onAddSaving,
 }) => {
-  const { setGoalStatus, deleteGoal, refreshGoal } = useGoalsStore();
+  const { setGoalStatus, deleteGoal } = useGoalsStore();
   const [goal, setGoal] = useState(initialGoal);
   const [prediction, setPrediction] = useState<{
-    can_predict: boolean; months_remaining?: number; predicted_date?: string; weekly_avg?: number;
+    can_predict: boolean;
+    months_remaining?: number;
+    predicted_date?: string;
+    weekly_avg?: number;
   } | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Animaciones de entrada
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, friction: 9, tension: 55, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   useEffect(() => {
     goalsService.getGoalPrediction(goal.id).then(setPrediction);
@@ -44,7 +81,8 @@ export const GoalDetailScreen: React.FC<GoalDetailScreenProps> = ({
     Alert.alert(`${label}`, `¿Quieres ${label.toLowerCase()} esta meta?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
-        text: label, onPress: async () => {
+        text: label,
+        onPress: async () => {
           setLoading(true);
           await setGoalStatus(goal.id, status);
           setGoal((g) => ({ ...g, status }));
@@ -58,7 +96,9 @@ export const GoalDetailScreen: React.FC<GoalDetailScreenProps> = ({
     Alert.alert('Eliminar meta', '¿Eliminar esta meta? Los ahorros asociados no se eliminarán.', [
       { text: 'Cancelar', style: 'cancel' },
       {
-        text: 'Eliminar', style: 'destructive', onPress: async () => {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
           await deleteGoal(goal.id);
           onBack();
         },
@@ -66,145 +106,182 @@ export const GoalDetailScreen: React.FC<GoalDetailScreenProps> = ({
     ]);
   };
 
-  const iconColor = goal.color ?? Colors.primary;
+  const iconColor = goal.color ?? Theme.color.primary;
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={[Colors.primaryDeep, Colors.primaryDark, iconColor + 'CC']} style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={onBack}>
-          <Ionicons name="arrow-back" size={24} color={Colors.white} />
+    <View style={S.Layout.screen}>
+      <StatusBar barStyle="light-content" backgroundColor={Theme.color.primaryDarker} />
+      
+      {/* Cabecera con Gradiente */}
+      <LinearGradient
+        colors={[Theme.color.primaryDarker, Theme.color.primaryDark, iconColor + 'A0']}
+        style={{
+          paddingTop: 56,
+          paddingBottom: 28,
+          paddingHorizontal: Theme.space.md,
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <Pressable
+          style={[S.Layout.backBtn, { position: 'absolute', top: 52, left: Theme.space.md, backgroundColor: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.2)' }]}
+          onPress={onBack}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={22} color={Theme.color.white} />
         </Pressable>
-        <Pressable style={styles.editBtn} onPress={() => onEdit(goal)}>
-          <Ionicons name="pencil-outline" size={22} color={Colors.white} />
+        <Pressable
+          style={[S.Layout.backBtn, { position: 'absolute', top: 52, right: Theme.space.md, backgroundColor: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.2)' }]}
+          onPress={() => onEdit(goal)}
+        >
+          <MaterialCommunityIcons name="pencil-outline" size={20} color={Theme.color.white} />
         </Pressable>
-        <View style={[styles.headerIcon, { backgroundColor: iconColor + '30' }]}>
-          <Ionicons name={goal.icon as any ?? 'wallet'} size={40} color={Colors.white} />
+
+        <View
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: 40,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: 24,
+            marginBottom: Theme.space.xs,
+          }}
+        >
+          <MaterialCommunityIcons name={(goal.icon as any) ?? 'wallet-outline'} size={36} color={Theme.color.white} />
         </View>
-        <Text style={styles.headerTitle}>{goal.name}</Text>
-        {goal.description ? <Text style={styles.headerDesc}>{goal.description}</Text> : null}
+
+        <Text style={[S.Typography.headingLg, { color: Theme.color.white, textAlign: 'center' }]}>
+          {goal.name}
+        </Text>
+        {goal.description ? (
+          <Text style={[S.Typography.bodyMd, { color: 'rgba(255,255,255,0.8)', textAlign: 'center', paddingHorizontal: Theme.space.md }]}>
+            {goal.description}
+          </Text>
+        ) : null}
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Progreso principal */}
-        <Card style={styles.progressCard}>
-          <Text style={styles.progressLabel}>Progreso total</Text>
-          <View style={styles.amountsRow}>
-            <Text style={styles.currentAmt}>{formatAmount(goal.current_amount, goal.currency)}</Text>
-            <Text style={styles.separator}> de </Text>
-            <Text style={styles.targetAmt}>{formatAmount(goal.target_amount, goal.currency)}</Text>
-          </View>
-          <ProgressBar progress={goal.progress_pct} color={iconColor} height={12} showPercentage />
-          <View style={styles.remainingRow}>
-            <Ionicons name="trending-up" size={16} color={Colors.textLight} />
-            <Text style={styles.remainingText}>
-              Faltan {formatAmount(remaining, goal.currency)}
+      <ScrollView contentContainerStyle={S.Layout.scrollPad} showsVerticalScrollIndicator={false}>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], gap: Theme.space.md }}>
+          
+          {/* Progreso principal */}
+          <Card style={S.Cards.basePad}>
+            <Text style={[S.Typography.label, { color: Theme.color.textMuted, marginBottom: Theme.space.sm }]}>
+              Progreso total
             </Text>
-          </View>
-        </Card>
-
-        {/* Predicción */}
-        <Card style={styles.predCard}>
-          <View style={styles.predHeader}>
-            <Ionicons name="time-outline" size={20} color={Colors.primary} />
-            <Text style={styles.predTitle}>Predicción</Text>
-          </View>
-          {prediction === null ? (
-            <ActivityIndicator color={Colors.primary} />
-          ) : prediction.can_predict ? (
-            <View style={styles.predBody}>
-              <Text style={styles.predMain}>
-                Al ritmo actual llegarás en{' '}
-                <Text style={styles.predHighlight}>{prediction.months_remaining} meses</Text>
+            
+            <View style={[S.Layout.rowBetween, { alignItems: 'baseline', marginBottom: Theme.space.sm }]}>
+              <View style={[S.Layout.row, { alignItems: 'baseline' }]}>
+                <Text style={S.Typography.amountLg}>{formatAmount(goal.current_amount, goal.currency)}</Text>
+                <Text style={[S.Typography.bodyMd, { color: Theme.color.textMuted }]}> de </Text>
+                <Text style={[S.Typography.headingSm, { color: Theme.color.textMedium }]}>
+                  {formatAmount(goal.target_amount, goal.currency)}
+                </Text>
+              </View>
+              <Text style={[S.Typography.amountSm, { color: iconColor }]}>
+                {Math.round(goal.progress_pct)}%
               </Text>
-              {prediction.predicted_date && (
-                <Text style={styles.predSub}>
-                  Fecha estimada: {formatDate(prediction.predicted_date)}
-                </Text>
-              )}
-              {prediction.weekly_avg && (
-                <Text style={styles.predSub}>
-                  Promedio semanal: {formatAmount(prediction.weekly_avg, goal.currency)}
-                </Text>
-              )}
             </View>
-          ) : (
-            <Text style={styles.predNone}>
-              Necesitamos más historial de ahorros para calcular una predicción.
-            </Text>
-          )}
-        </Card>
 
-        {/* Info */}
-        <Card style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Moneda</Text>
-            <Text style={styles.infoValue}>{goal.currency}</Text>
-          </View>
-          {goal.deadline && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Fecha límite</Text>
-              <Text style={styles.infoValue}>{formatDate(goal.deadline)}</Text>
+            <ProgressBar progress={goal.progress_pct} color={iconColor} />
+
+            <View style={[S.Layout.row, { gap: 6, marginTop: Theme.space.md }]}>
+              <MaterialCommunityIcons name="trending-up" size={16} color={Theme.color.textMuted} />
+              <Text style={S.Typography.bodySm}>
+                Faltan {formatAmount(remaining, goal.currency)}
+              </Text>
             </View>
-          )}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Estado</Text>
-            <Text style={[styles.infoValue, { color: Colors.primary }]}>{goal.status === 'active' ? 'Activa' : goal.status === 'paused' ? 'Pausada' : 'Completada'}</Text>
+          </Card>
+
+          {/* Predicción */}
+          <Card style={S.Cards.basePad}>
+            <View style={[S.Layout.row, { gap: 8, marginBottom: Theme.space.sm }]}>
+              <MaterialCommunityIcons name="clock-outline" size={20} color={Theme.color.primary} />
+              <Text style={S.Typography.headingSm}>Predicción</Text>
+            </View>
+
+            {prediction === null ? (
+              <ActivityIndicator color={Theme.color.primary} style={{ marginVertical: Theme.space.sm }} />
+            ) : prediction.can_predict ? (
+              <View style={{ gap: Theme.space.xs }}>
+                <Text style={S.Typography.bodyMd}>
+                  Al ritmo actual llegarás en{' '}
+                  <Text style={[S.Typography.link, { color: Theme.color.primary }]}>{prediction.months_remaining} meses</Text>
+                </Text>
+                {prediction.predicted_date && (
+                  <Text style={S.Typography.bodySm}>
+                    Fecha estimada: {formatDate(prediction.predicted_date)}
+                  </Text>
+                )}
+                {prediction.weekly_avg && (
+                  <Text style={S.Typography.bodySm}>
+                    Promedio semanal: {formatAmount(prediction.weekly_avg, goal.currency)}
+                  </Text>
+                )}
+              </View>
+            ) : (
+              <Text style={[S.Typography.bodySm, { fontStyle: 'italic' }]}>
+                Necesitamos más historial de ahorros para calcular una predicción.
+              </Text>
+            )}
+          </Card>
+
+          {/* Info de la meta */}
+          <Card style={S.Cards.listSection}>
+            <View style={[S.ListItems.row, S.ListItems.rowBorder]}>
+              <Text style={S.ListItems.rowLabel}>Moneda</Text>
+              <Text style={[S.Typography.bodyMd, { color: Theme.color.textDark }]}>{goal.currency}</Text>
+            </View>
+            
+            {goal.deadline && (
+              <View style={[S.ListItems.row, S.ListItems.rowBorder]}>
+                <Text style={S.ListItems.rowLabel}>Fecha límite</Text>
+                <Text style={[S.Typography.bodyMd, { color: Theme.color.textDark }]}>{formatDate(goal.deadline)}</Text>
+              </View>
+            )}
+
+            <View style={S.ListItems.row}>
+              <Text style={S.ListItems.rowLabel}>Estado</Text>
+              <Text style={[S.Typography.bodyMd, { color: Theme.color.primary, fontWeight: '600' }]}>
+                {goal.status === 'active' ? 'Activa' : goal.status === 'paused' ? 'Pausada' : 'Completada'}
+              </Text>
+            </View>
+          </Card>
+
+          {/* Acciones */}
+          <View style={{ gap: Theme.space.sm, marginTop: Theme.space.sm }}>
+            {goal.status !== 'completed' && goal.status !== 'deleted' && (
+              <Button
+                label="Agregar ahorro a esta meta"
+                variant="primary"
+                onPress={() => onAddSaving(goal.id)}
+              />
+            )}
+
+            {goal.status === 'active' && (
+              <Button
+                label="Pausar meta"
+                variant="outline"
+                onPress={() => handleStatusChange('paused', 'Pausar')}
+              />
+            )}
+            {goal.status === 'paused' && (
+              <Button
+                label="Reactivar meta"
+                variant="outline"
+                onPress={() => handleStatusChange('active', 'Reactivar')}
+              />
+            )}
+
+            <Button
+              label="Eliminar meta"
+              variant="danger"
+              onPress={handleDelete}
+            />
           </View>
-        </Card>
-
-        {/* Acciones */}
-        {goal.status !== 'completed' && goal.status !== 'deleted' && (
-          <Button
-            label="Agregar ahorro a esta meta"
-            variant="primary"
-            onPress={() => onAddSaving(goal.id)}
-            style={styles.actionBtn}
-          />
-        )}
-
-        {goal.status === 'active' && (
-          <Button label="Pausar meta" variant="outline" onPress={() => handleStatusChange('paused', 'Pausar')} style={styles.actionBtn} />
-        )}
-        {goal.status === 'paused' && (
-          <Button label="Reactivar meta" variant="outline" onPress={() => handleStatusChange('active', 'Reactivar')} style={styles.actionBtn} />
-        )}
-
-        <Button label="Eliminar meta" variant="danger" onPress={handleDelete} style={styles.actionBtn} />
-        <View style={{ height: 40 }} />
+          
+        </Animated.View>
       </ScrollView>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.backgroundMain },
-  header: { paddingTop: 60, paddingBottom: 32, paddingHorizontal: Spacing.screenHorizontal, alignItems: 'center', gap: Spacing[2] },
-  backBtn: { position: 'absolute', top: 60, left: Spacing.screenHorizontal },
-  editBtn: { position: 'absolute', top: 60, right: Spacing.screenHorizontal },
-  headerIcon: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginTop: 32, marginBottom: Spacing[2] },
-  headerTitle: { fontFamily: FontFamily.soraBold, fontSize: FontSize.xl, color: Colors.white, textAlign: 'center' },
-  headerDesc: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.75)', textAlign: 'center' },
-  content: { padding: Spacing.screenHorizontal, paddingTop: Spacing[5] },
-  progressCard: { gap: Spacing[3], marginBottom: Spacing[3] },
-  progressLabel: { fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.sm, color: Colors.textLight },
-  amountsRow: { flexDirection: 'row', alignItems: 'baseline' },
-  currentAmt: { fontFamily: FontFamily.soraBold, fontSize: FontSize['3xl'], color: Colors.textDark },
-  separator: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.base, color: Colors.textLight },
-  targetAmt: { fontFamily: FontFamily.soraSemiBold, fontSize: FontSize.lg, color: Colors.textLight },
-  remainingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  remainingText: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: Colors.textLight },
-  predCard: { gap: Spacing[3], marginBottom: Spacing[3] },
-  predHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  predTitle: { fontFamily: FontFamily.dmSansSemiBold, fontSize: FontSize.base, color: Colors.textDark },
-  predBody: { gap: 4 },
-  predMain: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.base, color: Colors.textDark, lineHeight: FontSize.base * 1.5 },
-  predHighlight: { fontFamily: FontFamily.soraSemiBold, color: Colors.primary },
-  predSub: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: Colors.textLight },
-  predNone: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: Colors.textLight, fontStyle: 'italic' },
-  infoCard: { marginBottom: Spacing[4] },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: Spacing[3], borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  infoLabel: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.base, color: Colors.textMedium },
-  infoValue: { fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.base, color: Colors.textDark },
-  actionBtn: { marginBottom: Spacing[3] },
-});

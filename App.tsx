@@ -4,7 +4,7 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Platform } from 'react-native';
 import { RootNavigator } from './frontend/src/navigation/RootNavigator';
 
 // Mantener splash nativo visible hasta que carguen las fuentes
@@ -30,13 +30,28 @@ export default function App() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <GestureHandlerRootView style={styles.root} onLayout={onLayoutRootView}>
-      <StatusBar style="light" />
-      <RootNavigator />
+    <GestureHandlerRootView style={styles.appWrapper} onLayout={onLayoutRootView}>
+      <View style={[styles.root, Platform.OS === 'web' && styles.webContainer]}>
+        <StatusBar style="light" />
+        <RootNavigator />
+      </View>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  appWrapper: { flex: 1, backgroundColor: '#E5E7EB' }, // Gris neutro de fondo web
+  root: { flex: 1, backgroundColor: '#FFFFFF' },
+  webContainer: {
+    maxWidth: 480,
+    width: '100%',
+    marginHorizontal: 'auto',
+    overflow: 'hidden',
+    // boxShadow no existe nativamente en StyleSheet para web sin fallar en TS, usamos shadow:
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
 });

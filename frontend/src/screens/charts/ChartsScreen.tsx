@@ -1,32 +1,98 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, StatusBar,
-  Dimensions, ActivityIndicator, Pressable,
+  View, Text, ScrollView, StatusBar,
+  Dimensions, ActivityIndicator, Pressable, Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { Card } from '../../components/ui/Card';
-import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '../../theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { S, Theme } from '../../theme/style';
 import { chartsService } from '../../services/chartsService';
 import { formatAmount, monthLabel } from '../../utils/format';
 import { useAuthStore } from '../../store/authStore';
 
 const { width } = Dimensions.get('window');
-const CHART_WIDTH = width - Spacing.screenHorizontal * 2 - 32;
-
-interface MonthlyStat { month: string; total: number }
-interface CurrencyDist { currency: string; total: number; percentage: number }
-interface GrowthPoint { date: string; cumulative: number }
-
+const CHART_WIDTH = width - Theme.space.md * 2 - 32;
 const BAR_MAX_HEIGHT = 120;
-const PALETTE = [Colors.primary, '#F59E0B', '#3B82F6', '#EC4899', '#8B5CF6', '#14B8A6'];
+const PALETTE = [Theme.color.primary, '#F59E0B', '#3B82F6', '#EC4899', '#8B5CF6', '#14B8A6'];
 
+interface MonthlyStat  { month: string; total: number }
+interface CurrencyDist { currency: string; total: number; percentage: number }
+interface GrowthPoint  { date: string; cumulative: number }
+
+// ─── Barra mensual animada ───────────────────────────────────
+const AnimatedBar: React.FC<{ value: number; maxValue: number; label: string; delay: number }> = ({
+  value, maxValue, label, delay,
+}) => {
+  const barH    = Math.max(4, (value / maxValue) * BAR_MAX_HEIGHT);
+  const heightAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(heightAnim, {
+        toValue: barH,
+        duration: 700,
+        delay,
+        useNativeDriver: false,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 400,
+        delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [barH]);
+
+  const displayVal = value > 0
+    ? formatAmount(value, 'DOP').replace('RD$', '').replace('$', '').trim()
+    : '';
+
+  return (
+    <Animated.View style={{ alignItems: 'center', gap: 4, opacity: opacityAnim }}>
+      <Text style={[S.Typography.caption, { fontSize: 9, textAlign: 'center' }]}>{displayVal}</Text>
+      <View style={{ justifyContent: 'flex-end', height: BAR_MAX_HEIGHT }}>
+        <Animated.View style={{ height: heightAnim, width: 28, borderRadius: 6, overflow: 'hidden' }}>
+          <LinearGradient
+            colors={[Theme.color.primary, Theme.color.primaryDark]}
+            style={{ flex: 1 }}
+          />
+        </Animated.View>
+      </View>
+      <Text style={S.Typography.caption}>{label}</Text>
+    </Animated.View>
+  );
+};
+
+// ─── Item resumen ────────────────────────────────────────────
+const SummaryItem: React.FC<{ icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; value: string }> = ({
+  icon, label, value,
+}) => (
+  <View style={{
+    width: '47%',
+    alignItems: 'center',
+    backgroundColor: Theme.color.primaryLighter,
+    borderRadius: Theme.radius.md,
+    padding: Theme.space.md,
+    gap: Theme.space.sm,
+  }}>
+    <View style={S.IconWrap.lg}>
+      <MaterialCommunityIcons name={icon} size={20} color={Theme.color.primary} />
+    </View>
+    <Text style={S.Typography.amountSm}>{value}</Text>
+    <Text style={[S.Typography.caption, { textAlign: 'center' }]}>{label}</Text>
+  </View>
+);
+
+// ─── Pantalla principal ──────────────────────────────────────
 export const ChartsScreen: React.FC = () => {
   const { user } = useAuthStore();
-  const [monthly, setMonthly] = useState<MonthlyStat[]>([]);
+  const [monthly, setMonthly]       = useState<MonthlyStat[]>([]);
   const [currencies, setCurrencies] = useState<CurrencyDist[]>([]);
-  const [growth, setGrowth] = useState<GrowthPoint[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [growth, setGrowth]         = useState<GrowthPoint[]>([]);
+  const [loading, setLoading]       = useState(true);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Promise.all([
@@ -38,188 +104,180 @@ export const ChartsScreen: React.FC = () => {
       setCurrencies(c);
       setGrowth(g);
       setLoading(false);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     });
   }, []);
 
   const mainCurrency = user?.main_currency ?? 'DOP';
-  const maxMonthly = Math.max(...monthly.map((m) => m.total), 1);
+  const maxMonthly   = Math.max(...monthly.map(m => m.total), 1);
 
   if (loading) {
     return (
-      <View style={styles.loadingRoot}>
-        <ActivityIndicator color={Colors.primary} size="large" />
+      <View style={[S.Layout.screen, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator color={Theme.color.primary} size="large" />
       </View>
     );
   }
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={[Colors.primaryDeep, Colors.primaryDark]} style={styles.header}>
-        <Text style={styles.headerTitle}>Estadísticas</Text>
-        <Text style={styles.headerSub}>Visualiza tu progreso financiero</Text>
+    <View style={S.Layout.screen}>
+      <StatusBar barStyle="light-content" backgroundColor={Theme.color.primaryDarker} />
+
+      {/* Header degradado */}
+      <LinearGradient
+        colors={[Theme.color.primaryDarker, Theme.color.primaryDark]}
+        style={{
+          paddingTop: 60,
+          paddingBottom: 24,
+          paddingHorizontal: Theme.space.md,
+        }}
+      >
+        <Text style={[S.Typography.displayMd, { color: Theme.color.white }]}>Estadísticas</Text>
+        <Text style={[S.Typography.bodyMd, { color: 'rgba(255,255,255,0.7)', marginTop: 4 }]}>
+          Visualiza tu progreso financiero
+        </Text>
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={S.Layout.scrollPad}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={{ opacity: fadeAnim }}>
 
-        {/* ─── GRÁFICO DE BARRAS MENSUAL ─── */}
-        <Card style={styles.chartCard}>
-          <Text style={styles.chartTitle}>Ahorro mensual</Text>
-          <Text style={styles.chartSubtitle}>Últimos {monthly.length} meses</Text>
+          {/* ─── BARRAS MENSUALES ─── */}
+          <View style={[S.Cards.basePadLg, { marginBottom: Theme.space.md, gap: Theme.space.sm }]}>
+            <Text style={S.Typography.headingSm}>Ahorro mensual</Text>
+            <Text style={S.Typography.bodySm}>Últimos {monthly.length} meses</Text>
 
-          {monthly.length === 0 ? (
-            <View style={styles.noData}><Text style={styles.noDataText}>Sin datos aún</Text></View>
-          ) : (
-            <View style={styles.barsContainer}>
-              {monthly.map((m) => {
-                const barH = Math.max(4, (m.total / maxMonthly) * BAR_MAX_HEIGHT);
-                return (
-                  <View key={m.month} style={styles.barWrapper}>
-                    <Text style={styles.barValue}>
-                      {m.total > 0 ? formatAmount(m.total, mainCurrency).replace('RD$', '').replace('$', '') : ''}
-                    </Text>
-                    <View style={styles.barTrack}>
-                      <LinearGradient
-                        colors={[Colors.primary, Colors.primaryDark]}
-                        style={[styles.bar, { height: barH }]}
-                      />
+            {monthly.length === 0 ? (
+              <View style={{ height: 80, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={[S.Typography.bodySm, { fontStyle: 'italic' }]}>Sin datos aún</Text>
+              </View>
+            ) : (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'flex-end',
+                justifyContent: 'space-around',
+                height: BAR_MAX_HEIGHT + 48,
+              }}>
+                {monthly.map((m, i) => (
+                  <AnimatedBar
+                    key={m.month}
+                    value={m.total}
+                    maxValue={maxMonthly}
+                    label={monthLabel(m.month)}
+                    delay={i * 80}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* ─── DISTRIBUCIÓN MONEDAS ─── */}
+          {currencies.length > 0 && (
+            <View style={[S.Cards.basePadLg, { marginBottom: Theme.space.md, gap: Theme.space.sm }]}>
+              <Text style={S.Typography.headingSm}>Distribución por moneda</Text>
+              <Text style={S.Typography.bodySm}>Total ahorrado por moneda</Text>
+
+              <View style={{ gap: Theme.space.sm }}>
+                {currencies.map((c, i) => (
+                  <View key={c.currency} style={{ gap: 6 }}>
+                    <View style={[S.Layout.row, { gap: 8 }]}>
+                      <View style={{
+                        width: 10, height: 10, borderRadius: 5,
+                        backgroundColor: PALETTE[i % PALETTE.length],
+                      }} />
+                      <Text style={[S.Typography.headingSm, { fontSize: Theme.size.sm }]}>{c.currency}</Text>
+                      <Text style={[S.Typography.amountXs, { color: PALETTE[i % PALETTE.length], flex: 1 }]}>
+                        {Math.round(c.percentage)}%
+                      </Text>
+                      <Text style={S.Typography.bodySm}>{formatAmount(c.total, c.currency)}</Text>
                     </View>
-                    <Text style={styles.barLabel}>{monthLabel(m.month)}</Text>
+                    {/* Barra horizontal */}
+                    <View style={[S.Progress.trackSm, { height: 8 }]}>
+                      <View style={[S.Progress.fill, {
+                        width: `${c.percentage}%`,
+                        backgroundColor: PALETTE[i % PALETTE.length],
+                      }]} />
+                    </View>
                   </View>
-                );
-              })}
+                ))}
+              </View>
             </View>
           )}
-        </Card>
 
-        {/* ─── DISTRIBUCIÓN POR MONEDA ─── */}
-        {currencies.length > 0 && (
-          <Card style={styles.chartCard}>
-            <Text style={styles.chartTitle}>Distribución por moneda</Text>
-            <Text style={styles.chartSubtitle}>Total ahorrado por moneda</Text>
+          {/* ─── CRECIMIENTO ACUMULADO ─── */}
+          {growth.length > 1 && (
+            <View style={[S.Cards.basePadLg, { marginBottom: Theme.space.md, gap: Theme.space.sm }]}>
+              <Text style={S.Typography.headingSm}>Crecimiento acumulado</Text>
+              <Text style={S.Typography.bodySm}>Últimos 90 días ({mainCurrency})</Text>
 
-            {/* Barras horizontales */}
-            <View style={styles.currencyBars}>
-              {currencies.map((c, i) => (
-                <View key={c.currency} style={styles.currencyRow}>
-                  <View style={styles.currencyLabelRow}>
-                    <View style={[styles.currencyDot, { backgroundColor: PALETTE[i % PALETTE.length] }]} />
-                    <Text style={styles.currencyLabel}>{c.currency}</Text>
-                    <Text style={styles.currencyPct}>{Math.round(c.percentage)}%</Text>
-                    <Text style={styles.currencyTotal}>{formatAmount(c.total, c.currency)}</Text>
-                  </View>
-                  <View style={styles.hTrack}>
-                    <View style={[styles.hBar, { width: `${c.percentage}%`, backgroundColor: PALETTE[i % PALETTE.length] }]} />
-                  </View>
-                </View>
-              ))}
+              {/* Sparkline de barras */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 64, gap: 2 }}>
+                {(() => {
+                  const maxG  = Math.max(...growth.map(g => g.cumulative), 1);
+                  const step  = Math.max(1, Math.floor(growth.length / 30));
+                  const points = growth.filter((_, i) => i % step === 0 || i === growth.length - 1);
+                  return points.map((pt, i) => {
+                    const h = Math.max(2, (pt.cumulative / maxG) * 60);
+                    return (
+                      <View
+                        key={pt.date}
+                        style={{
+                          flex: 1,
+                          height: h,
+                          borderRadius: 2,
+                          minHeight: 2,
+                          backgroundColor: i === points.length - 1
+                            ? Theme.color.primary
+                            : Theme.color.primaryLighter,
+                        }}
+                      />
+                    );
+                  });
+                })()}
+              </View>
+
+              <Text style={[S.Typography.amountSm, { color: Theme.color.primary }]}>
+                Total actual: {formatAmount(growth[growth.length - 1]?.cumulative ?? 0, mainCurrency)}
+              </Text>
             </View>
-          </Card>
-        )}
+          )}
 
-        {/* ─── CRECIMIENTO ACUMULADO ─── */}
-        {growth.length > 1 && (
-          <Card style={styles.chartCard}>
-            <Text style={styles.chartTitle}>Crecimiento acumulado</Text>
-            <Text style={styles.chartSubtitle}>Últimos 90 días ({mainCurrency})</Text>
-
-            {/* Mini sparkline SVG-like usando barras */}
-            <View style={styles.sparkContainer}>
-              {(() => {
-                const maxG = Math.max(...growth.map((g) => g.cumulative), 1);
-                const step = Math.max(1, Math.floor(growth.length / 30));
-                const points = growth.filter((_, i) => i % step === 0 || i === growth.length - 1);
-                return points.map((pt, i) => {
-                  const h = Math.max(2, (pt.cumulative / maxG) * 60);
-                  return (
-                    <View key={pt.date} style={[styles.sparkBar, { height: h, backgroundColor: i === points.length - 1 ? Colors.primary : Colors.primaryLight }]} />
-                  );
-                });
-              })()}
+          {/* ─── RESUMEN GRID ─── */}
+          <View style={[S.Cards.basePadLg, { marginBottom: Theme.space.md }]}>
+            <Text style={[S.Typography.headingSm, { marginBottom: Theme.space.sm }]}>Resumen</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Theme.space.sm }}>
+              <SummaryItem
+                icon="trending-up"
+                label="Mejor mes"
+                value={monthly.length > 0
+                  ? formatAmount(Math.max(...monthly.map(m => m.total)), mainCurrency)
+                  : '—'}
+              />
+              <SummaryItem
+                icon="cash"
+                label="Promedio/mes"
+                value={monthly.length > 0
+                  ? formatAmount(monthly.reduce((s, m) => s + m.total, 0) / monthly.length, mainCurrency)
+                  : '—'}
+              />
+              <SummaryItem
+                icon="flag-outline"
+                label="Monedas"
+                value={`${currencies.length}`}
+              />
+              <SummaryItem
+                icon="calendar-month-outline"
+                label="Meses activos"
+                value={`${monthly.filter(m => m.total > 0).length}`}
+              />
             </View>
-            <Text style={styles.growthTotal}>
-              Total actual: {formatAmount(growth[growth.length - 1]?.cumulative ?? 0, mainCurrency)}
-            </Text>
-          </Card>
-        )}
-
-        {/* ─── RESUMEN ─── */}
-        <Card style={styles.summaryCard}>
-          <Text style={styles.chartTitle}>Resumen</Text>
-          <View style={styles.summaryGrid}>
-            <SummaryItem icon="trending-up" label="Mejor mes" value={
-              monthly.length > 0
-                ? formatAmount(Math.max(...monthly.map((m) => m.total)), mainCurrency)
-                : '—'
-            } />
-            <SummaryItem icon="cash" label="Promedio/mes" value={
-              monthly.length > 0
-                ? formatAmount(monthly.reduce((s, m) => s + m.total, 0) / monthly.length, mainCurrency)
-                : '—'
-            } />
-            <SummaryItem icon="flag" label="Monedas" value={`${currencies.length}`} />
-            <SummaryItem icon="calendar" label="Meses activos" value={`${monthly.filter((m) => m.total > 0).length}`} />
           </View>
-        </Card>
 
-        <View style={{ height: 80 }} />
+          <View style={{ height: 80 }} />
+        </Animated.View>
       </ScrollView>
     </View>
   );
 };
-
-const SummaryItem: React.FC<{ icon: string; label: string; value: string }> = ({ icon, label, value }) => (
-  <View style={styles.summaryItem}>
-    <View style={styles.summaryIcon}>
-      <Ionicons name={icon as any} size={20} color={Colors.primary} />
-    </View>
-    <Text style={styles.summaryValue}>{value}</Text>
-    <Text style={styles.summaryLabel}>{label}</Text>
-  </View>
-);
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.backgroundMain },
-  loadingRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.backgroundMain },
-  header: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: Spacing.screenHorizontal },
-  headerTitle: { fontFamily: FontFamily.soraBold, fontSize: FontSize['2xl'], color: Colors.white },
-  headerSub: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
-  content: { padding: Spacing.screenHorizontal, paddingBottom: 24 },
-  chartCard: { marginBottom: Spacing[4], gap: Spacing[3] },
-  chartTitle: { fontFamily: FontFamily.dmSansSemiBold, fontSize: FontSize.md, color: Colors.textDark },
-  chartSubtitle: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.xs, color: Colors.textLight, marginTop: -8 },
-  noData: { height: 80, alignItems: 'center', justifyContent: 'center' },
-  noDataText: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: Colors.textLight, fontStyle: 'italic' },
-
-  // Barras mensuales
-  barsContainer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', height: BAR_MAX_HEIGHT + 48 },
-  barWrapper: { alignItems: 'center', gap: 4 },
-  barTrack: { justifyContent: 'flex-end', height: BAR_MAX_HEIGHT },
-  bar: { width: 28, borderRadius: 6 },
-  barValue: { fontFamily: FontFamily.soraSemiBold, fontSize: 9, color: Colors.textLight, textAlign: 'center' },
-  barLabel: { fontFamily: FontFamily.dmSansRegular, fontSize: 11, color: Colors.textMedium },
-
-  // Distribución monedas
-  currencyBars: { gap: Spacing[3] },
-  currencyRow: { gap: 6 },
-  currencyLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  currencyDot: { width: 10, height: 10, borderRadius: 5 },
-  currencyLabel: { fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.sm, color: Colors.textDark },
-  currencyPct: { fontFamily: FontFamily.soraSemiBold, fontSize: FontSize.sm, color: Colors.primary, flex: 1 },
-  currencyTotal: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.xs, color: Colors.textLight },
-  hTrack: { height: 8, backgroundColor: Colors.primaryLight, borderRadius: BorderRadius.full, overflow: 'hidden' },
-  hBar: { height: 8, borderRadius: BorderRadius.full },
-
-  // Sparkline
-  sparkContainer: { flexDirection: 'row', alignItems: 'flex-end', height: 64, gap: 2 },
-  sparkBar: { flex: 1, borderRadius: 2, minHeight: 2 },
-  growthTotal: { fontFamily: FontFamily.soraSemiBold, fontSize: FontSize.base, color: Colors.primary },
-
-  // Resumen
-  summaryCard: { marginBottom: Spacing[4] },
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing[3] },
-  summaryItem: { width: '47%', alignItems: 'center', backgroundColor: Colors.primarySoft, borderRadius: BorderRadius.md, padding: Spacing[4], gap: Spacing[2] },
-  summaryIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  summaryValue: { fontFamily: FontFamily.soraBold, fontSize: FontSize.lg, color: Colors.textDark },
-  summaryLabel: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.xs, color: Colors.textLight, textAlign: 'center' },
-});

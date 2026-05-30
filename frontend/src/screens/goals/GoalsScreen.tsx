@@ -1,153 +1,214 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, Pressable,
-  RefreshControl, StatusBar,
+  View,
+  Text,
+  TouchableOpacity,
+  StatusBar,
+  Animated,
+  FlatList,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { Card } from '../../components/ui/Card';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { S, Theme } from '../../theme/style';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Colors, FontFamily, FontSize, Spacing, BorderRadius, Shadows } from '../../theme';
-import { useGoalsStore } from '../../store/goalsStore';
-import { formatAmount } from '../../utils/format';
-import type { Goal } from '../../types';
 
-const STATUS_LABELS: Record<string, string> = {
-  active: 'Activa',
-  paused: 'Pausada',
-  completed: 'Completada',
-};
-const STATUS_COLORS: Record<string, string> = {
-  active: Colors.primary,
-  paused: Colors.warning,
-  completed: Colors.primary,
-};
+type GoalStatus = 'active' | 'paused' | 'completed';
 
-interface GoalsScreenProps {
-  onCreateGoal: () => void;
-  onGoalDetail: (goal: Goal) => void;
+interface Goal {
+  id: string;
+  name: string;
+  icon: string;
+  current: number;
+  target: number;
+  currency: string;
+  deadline?: string;
+  status: GoalStatus;
+  color: string;
+  prediction?: string;
 }
 
-export const GoalsScreen: React.FC<GoalsScreenProps> = ({
-  onCreateGoal,
-  onGoalDetail,
+const GOALS: Goal[] = [
+  { id: '1', name: 'Viaje a Europa',   icon: 'airplane',             current: 42000, target: 80000, currency: 'RD$', deadline: 'Dic 2025', status: 'active',    color: '#1976D2', prediction: 'Oct 2025' },
+  { id: '2', name: 'Carro nuevo',      icon: 'car-outline',          current: 18500, target: 50000, currency: 'RD$', deadline: 'Mar 2026', status: 'active',    color: '#7B1FA2', prediction: 'Feb 2026' },
+  { id: '3', name: 'Fondo emergencia', icon: 'shield-check-outline', current: 22000, target: 30000, currency: 'RD$', status: 'active',    color: '#00796B', prediction: 'Jul 2025' },
+  { id: '4', name: 'Laptop nueva',     icon: 'laptop',               current: 4000,  target: 12000, currency: 'RD$', status: 'paused',    color: '#E65100' },
+  { id: '5', name: 'Vacaciones RD',    icon: 'beach',                current: 8000,  target: 8000,  currency: 'RD$', status: 'completed', color: '#2E7D32' },
+];
+
+const STATUS_CONFIG: Record<GoalStatus, { label: string; chipStyle: object; textStyle: object }> = {
+  active:    { label: 'Activa',     chipStyle: S.Chips.badgeGreen,   textStyle: S.Chips.badgeTextGreen   },
+  paused:    { label: 'Pausada',    chipStyle: S.Chips.badgeWarning, textStyle: S.Chips.badgeTextWarning },
+  completed: { label: 'Completada', chipStyle: S.Chips.badgeInfo,    textStyle: S.Chips.badgeTextInfo    },
+};
+
+// ─── Tarjeta de meta animada ──────────────────────────────────
+const AnimatedGoalCard: React.FC<{ goal: Goal; index: number; onPress: () => void }> = ({
+  goal,
+  index,
+  onPress,
 }) => {
-  const { goals, isLoading, fetchGoals } = useGoalsStore();
-  const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all');
+  const fade  = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(20)).current;
 
-  useEffect(() => { fetchGoals(); }, []);
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade,  { toValue: 1, duration: 380, delay: index * 70, useNativeDriver: true }),
+      Animated.spring(slide, { toValue: 0, delay: index * 70, friction: 9, tension: 55, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
-  const filtered = filter === 'all'
-    ? goals
-    : goals.filter((g) => g.status === filter);
-
-  const renderGoal = ({ item }: { item: Goal }) => (
-    <Pressable onPress={() => onGoalDetail(item)} style={styles.goalPressable}>
-      <Card style={styles.goalCard}>
-        <View style={styles.goalHeader}>
-          <View style={[styles.goalIcon, { backgroundColor: (item.color ?? Colors.primary) + '20' }]}>
-            <Ionicons name={item.icon as any ?? 'wallet'} size={22} color={item.color ?? Colors.primary} />
-          </View>
-          <View style={styles.goalMeta}>
-            <Text style={styles.goalName} numberOfLines={1}>{item.name}</Text>
-            {item.deadline && (
-              <Text style={styles.goalDeadline}>
-                Límite: {new Date(item.deadline + 'T00:00:00').toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' })}
-              </Text>
-            )}
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] + '18' }]}>
-            <Text style={[styles.statusText, { color: STATUS_COLORS[item.status] }]}>
-              {STATUS_LABELS[item.status] ?? item.status}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.amountsRow}>
-          <Text style={styles.currentAmount}>{formatAmount(item.current_amount, item.currency)}</Text>
-          <Text style={styles.targetAmount}>de {formatAmount(item.target_amount, item.currency)}</Text>
-        </View>
-
-        <ProgressBar progress={item.progress_pct} color={item.color ?? Colors.primary} showPercentage />
-      </Card>
-    </Pressable>
-  );
+  const progress = Math.min(goal.current / goal.target, 1);
+  const pct      = Math.round(progress * 100);
+  const cfg      = STATUS_CONFIG[goal.status];
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={[Colors.primaryDeep, Colors.primaryDark]} style={styles.header}>
-        <Text style={styles.headerTitle}>Mis metas</Text>
-        <Text style={styles.headerSub}>{goals.filter(g => g.status === 'active').length} metas activas</Text>
-      </LinearGradient>
+    <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
+      <TouchableOpacity style={S.Cards.goal} activeOpacity={0.75} onPress={onPress}>
 
-      {/* Filtros */}
-      <View style={styles.filtersRow}>
-        {(['all', 'active', 'paused', 'completed'] as const).map((f) => (
-          <Pressable key={f} style={[styles.filterChip, filter === f && styles.filterChipActive]} onPress={() => setFilter(f)}>
-            <Text style={[styles.filterChipText, filter === f && styles.filterChipTextActive]}>
-              {f === 'all' ? 'Todas' : STATUS_LABELS[f]}
+        {/* Top row */}
+        <View style={[S.Layout.row, { gap: 10, marginBottom: Theme.space.md }]}>
+          <View style={[S.IconWrap.lg, { backgroundColor: goal.color + '18', borderRadius: 12 }]}>
+            <MaterialCommunityIcons name={goal.icon as any} size={22} color={goal.color} />
+          </View>
+          <View style={S.Layout.flex1}>
+            <Text style={S.Typography.headingSm}>{goal.name}</Text>
+            {goal.deadline && (
+              <View style={[S.Layout.row, { gap: 3, marginTop: 2 }]}>
+                <MaterialCommunityIcons name="calendar-outline" size={12} color={Theme.color.textMuted} />
+                <Text style={S.Typography.bodySm}>Límite: {goal.deadline}</Text>
+              </View>
+            )}
+          </View>
+          <View style={cfg.chipStyle as any}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: goal.color }} />
+            <Text style={cfg.textStyle as any}>{cfg.label}</Text>
+          </View>
+        </View>
+
+        {/* Amounts */}
+        <View style={[S.Layout.rowBetween, { marginBottom: 10 }]}>
+          <View>
+            <Text style={S.Typography.caption}>Ahorrado</Text>
+            <Text style={[S.Typography.amountMd, { color: goal.color }]}>
+              {goal.currency}{goal.current.toLocaleString()}
             </Text>
-          </Pressable>
+          </View>
+          <View style={{
+            width: 46, height: 46, borderRadius: 23,
+            backgroundColor: Theme.color.bgMain,
+            alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1, borderColor: Theme.color.borderLight,
+          }}>
+            <Text style={[S.Typography.amountXs, { color: goal.color, letterSpacing: -0.3 }]}>{pct}%</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={S.Typography.caption}>Objetivo</Text>
+            <Text style={[S.Typography.amountMd, { color: Theme.color.textDark }]}>
+              {goal.currency}{goal.target.toLocaleString()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Progress bar */}
+        <ProgressBar progress={pct} color={goal.color} size="sm" />
+
+        {/* Predicción */}
+        {goal.prediction && goal.status === 'active' && (
+          <View style={[S.Layout.row, { gap: 4, marginTop: 8 }]}>
+            <MaterialCommunityIcons name="lightning-bolt" size={13} color={goal.color} />
+            <Text style={[S.Typography.caption, { color: Theme.color.textMedium }]}>
+              Estimado: {goal.prediction}
+            </Text>
+          </View>
+        )}
+
+        {/* Actions */}
+        <View style={[S.Layout.row, {
+          gap: 8, paddingTop: 10,
+          borderTopWidth: 1, borderTopColor: Theme.color.borderLight,
+          marginTop: 10,
+        }]}>
+          <TouchableOpacity style={S.Buttons.actionText} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="plus-circle-outline" size={15} color={Theme.color.primary} />
+            <Text style={S.Buttons.actionTextLabel}>Agregar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={S.Buttons.actionText} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="pencil-outline" size={15} color={Theme.color.textMedium} />
+            <Text style={[S.Buttons.actionTextLabel, { color: Theme.color.textMedium }]}>Editar</Text>
+          </TouchableOpacity>
+          {goal.status === 'active' && (
+            <TouchableOpacity style={S.Buttons.actionText} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="pause-circle-outline" size={15} color={Theme.color.warning} />
+              <Text style={[S.Buttons.actionTextLabel, { color: Theme.color.warning }]}>Pausar</Text>
+            </TouchableOpacity>
+          )}
+          {goal.status === 'paused' && (
+            <TouchableOpacity style={S.Buttons.actionText} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="play-circle-outline" size={15} color={Theme.color.primary} />
+              <Text style={S.Buttons.actionTextLabel}>Reanudar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// ─── Pantalla principal ───────────────────────────────────────
+const GoalsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  return (
+    <View style={S.Layout.screen}>
+      <StatusBar barStyle="dark-content" backgroundColor={Theme.color.bgMain} />
+
+      {/* Header */}
+      <View style={S.Layout.header}>
+        <TouchableOpacity style={S.Layout.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="chevron-left" size={24} color={Theme.color.textDark} />
+        </TouchableOpacity>
+        <Text style={S.Layout.headerTitle}>Mis metas</Text>
+        <TouchableOpacity style={S.Buttons.iconCircleGreen} activeOpacity={0.8}>
+          <MaterialCommunityIcons name="plus" size={20} color={Theme.color.white} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Summary chips */}
+      <View style={[S.Layout.row, { gap: 8, paddingHorizontal: Theme.space.md, marginBottom: Theme.space.md }]}>
+        {[
+          { icon: 'check-circle-outline', label: `${GOALS.filter(g => g.status === 'active').length} activas`,    chip: S.Chips.badgeGreen,   text: S.Chips.badgeTextGreen   },
+          { icon: 'pause-circle-outline', label: `${GOALS.filter(g => g.status === 'paused').length} pausadas`,   chip: S.Chips.badgeWarning, text: S.Chips.badgeTextWarning },
+          { icon: 'trophy-outline',       label: `${GOALS.filter(g => g.status === 'completed').length} completadas`, chip: S.Chips.badgeInfo, text: S.Chips.badgeTextInfo },
+        ].map(chip => (
+          <View key={chip.label} style={[S.Chips.filter, { borderRadius: Theme.radius.full }]}>
+            <Text style={S.Chips.filterText}>{chip.label}</Text>
+          </View>
         ))}
       </View>
 
       <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        renderItem={renderGoal}
-        contentContainerStyle={styles.list}
+        data={GOALS}
+        keyExtractor={item => item.id}
+        contentContainerStyle={[S.Layout.scrollPad, { paddingTop: 4 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={() => fetchGoals()} tintColor={Colors.primary} />
-        }
+        renderItem={({ item, index }) => (
+          <AnimatedGoalCard
+            goal={item}
+            index={index}
+            onPress={() => navigation.navigate('GoalDetail', { goalId: item.id })}
+          />
+        )}
         ListEmptyComponent={
-          !isLoading ? (
-            <EmptyState
-              icon="flag-outline"
-              title="Sin metas aún"
-              subtitle="Crea tu primera meta de ahorro y empieza a progresar."
-              actionLabel="Crear meta"
-              onAction={onCreateGoal}
-            />
-          ) : null
+          <EmptyState
+            icon="flag-outline"
+            title="No tienes metas aún"
+            subtitle="Crea tu primera meta de ahorro"
+            actionLabel="Crear meta"
+            onAction={() => navigation.navigate('CreateGoal')}
+          />
         }
+        ListFooterComponent={<View style={{ height: 80 }} />}
       />
-
-      {/* FAB */}
-      <Pressable style={styles.fab} onPress={onCreateGoal}>
-        <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.fabGradient}>
-          <Ionicons name="add" size={28} color={Colors.white} />
-        </LinearGradient>
-      </Pressable>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.backgroundMain },
-  header: { paddingTop: 60, paddingBottom: 24, paddingHorizontal: Spacing.screenHorizontal },
-  headerTitle: { fontFamily: FontFamily.soraBold, fontSize: FontSize['2xl'], color: Colors.white },
-  headerSub: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
-  filtersRow: { flexDirection: 'row', paddingHorizontal: Spacing.screenHorizontal, paddingVertical: Spacing[3], gap: 8 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: BorderRadius.full, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.white },
-  filterChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primary },
-  filterChipText: { fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.sm, color: Colors.textMedium },
-  filterChipTextActive: { color: Colors.white },
-  list: { padding: Spacing.screenHorizontal, paddingBottom: 100 },
-  goalPressable: { marginBottom: Spacing[3] },
-  goalCard: { gap: Spacing[3] },
-  goalHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing[3] },
-  goalIcon: { width: 44, height: 44, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center' },
-  goalMeta: { flex: 1 },
-  goalName: { fontFamily: FontFamily.dmSansSemiBold, fontSize: FontSize.base, color: Colors.textDark },
-  goalDeadline: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.xs, color: Colors.textLight, marginTop: 2 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: BorderRadius.full },
-  statusText: { fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.xs },
-  amountsRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  currentAmount: { fontFamily: FontFamily.soraSemiBold, fontSize: FontSize.xl, color: Colors.textDark },
-  targetAmount: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: Colors.textLight },
-  fab: { position: 'absolute', bottom: 24, right: 24, ...Shadows.fab },
-  fabGradient: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
-});
+export default GoalsScreen;

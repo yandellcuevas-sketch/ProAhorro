@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LoginScreen } from '../screens/auth/LoginScreen';
+import LoginScreen from '../screens/auth/LoginScreen';
 import { RegisterScreen } from '../screens/auth/RegisterScreen';
 import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
 
@@ -25,9 +25,13 @@ export const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onAuthenticated })
     default:
       return (
         <LoginScreen
-          onNavigateToRegister={() => setScreen('register')}
-          onNavigateToForgotPassword={() => setScreen('forgot')}
-          onLoginSuccess={onAuthenticated}
+          navigation={{
+            navigate: (screen: string) => {
+              if (screen === 'Register') setScreen('register');
+              if (screen === 'ForgotPassword') setScreen('forgot');
+            },
+            replace: onAuthenticated,
+          }}
         />
       );
   }

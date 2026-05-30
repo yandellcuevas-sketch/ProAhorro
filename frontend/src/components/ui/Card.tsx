@@ -1,27 +1,37 @@
 import React from 'react';
-import { View, StyleSheet, ViewProps } from 'react-native';
-import { Colors, BorderRadius, Shadows, Spacing } from '../../theme';
+import { View, ViewProps } from 'react-native';
+import { S, Theme } from '../../theme/style';
 
 interface CardProps extends ViewProps {
-  variant?: 'white' | 'green' | 'soft';
+  variant?: 'base' | 'padded' | 'paddedLg' | 'goal' | 'stat' | 'listSection' | 'danger';
   padding?: number;
   noPadding?: boolean;
 }
 
 export const Card: React.FC<CardProps> = ({
   children,
-  variant = 'white',
-  padding = Spacing.cardPadding,
+  variant = 'padded',
+  padding,
   noPadding = false,
   style,
   ...props
 }) => {
+  const variantStyle = {
+    base: S.Cards.base,
+    padded: S.Cards.basePad,
+    paddedLg: S.Cards.basePadLg,
+    goal: S.Cards.goal,
+    stat: S.Cards.stat,
+    listSection: S.Cards.listSection,
+    danger: S.Cards.danger,
+  }[variant];
+
   return (
     <View
       style={[
-        styles.base,
-        styles[variant],
-        !noPadding && { padding },
+        variantStyle,
+        noPadding && { padding: 0 },
+        padding !== undefined && { padding },
         style,
       ]}
       {...props}
@@ -30,23 +40,3 @@ export const Card: React.FC<CardProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  base: {
-    borderRadius: BorderRadius.card,
-    overflow: 'hidden',
-  },
-  white: {
-    backgroundColor: Colors.white,
-    ...Shadows.md,
-  },
-  green: {
-    backgroundColor: Colors.primaryDark,
-    ...Shadows.hero,
-  },
-  soft: {
-    backgroundColor: Colors.primarySoft,
-    borderWidth: 1,
-    borderColor: Colors.primaryLight,
-  },
-});

@@ -1,21 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   StatusBar,
+  Animated,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '../../theme';
+import { S, Theme } from '../../theme/style';
 import { registerSchema, type RegisterFormData } from '../../validations/auth.schema';
 import { useAuthStore } from '../../store/authStore';
 
@@ -30,6 +29,16 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
 }) => {
   const { register, isLoading } = useAuthStore();
   const [submitError, setSubmitError] = useState('');
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 50, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   const { control, handleSubmit, formState: { errors } } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -47,193 +56,139 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
   };
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient
-        colors={[Colors.primaryDeep, Colors.primaryDark]}
-        style={styles.header}
-      >
-        <Pressable style={styles.backBtn} onPress={onNavigateToLogin}>
-          <Ionicons name="arrow-back" size={24} color={Colors.white} />
+    <View style={S.Layout.screen}>
+      <StatusBar barStyle="dark-content" backgroundColor={Theme.color.bgMain} />
+
+      {/* Header */}
+      <View style={[S.Layout.header, { backgroundColor: Theme.color.primaryDark, paddingTop: Platform.OS === 'ios' ? 52 : 36, paddingBottom: 24 }]}>
+        <Pressable style={[S.Layout.backBtn, { backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.2)' }]} onPress={onNavigateToLogin}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={Theme.color.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>Crear cuenta</Text>
-        <Text style={styles.headerSubtitle}>Empieza a ahorrar hoy</Text>
-      </LinearGradient>
+        <View style={S.Layout.flex1}>
+          <Text style={[S.Typography.headingXl, { color: Theme.color.white, marginBottom: 2 }]}>
+            Crear cuenta
+          </Text>
+          <Text style={[S.Typography.bodyMd, { color: 'rgba(255,255,255,0.7)' }]}>
+            Empieza a ahorrar hoy
+          </Text>
+        </View>
+        <View style={{ width: 40 }} />
+      </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.body}
+        style={S.Layout.flex1}
       >
         <ScrollView
-          contentContainerStyle={styles.form}
+          contentContainerStyle={S.Layout.scrollPad}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {submitError ? (
-            <View style={styles.errorBanner}>
-              <Text style={styles.errorBannerText}>{submitError}</Text>
-            </View>
-          ) : null}
+          <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
-          <Controller
-            control={control}
-            name="name"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <Input
-                label="Nombre"
-                placeholder="Tu nombre"
-                autoCapitalize="words"
-                leftIcon="person-outline"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.name?.message}
-              />
-            )}
-          />
+            {/* Error banner */}
+            {submitError ? (
+              <View style={[S.Cards.danger, { marginBottom: Theme.space.md, borderLeftWidth: 3, borderLeftColor: Theme.color.danger }]}>
+                <Text style={S.Typography.danger}>{submitError}</Text>
+              </View>
+            ) : null}
 
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <Input
-                label="Email"
-                placeholder="tu@email.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                leftIcon="mail-outline"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.email?.message}
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <Input
-                label="Contraseña"
-                placeholder="Mínimo 8 caracteres"
-                isPassword
-                leftIcon="lock-closed-outline"
-                hint="Incluye mayúsculas, minúsculas y números"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.password?.message}
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="confirmPassword"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <Input
-                label="Confirmar contraseña"
-                placeholder="Repite tu contraseña"
-                isPassword
-                leftIcon="shield-checkmark-outline"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.confirmPassword?.message}
-              />
-            )}
-          />
-
-          <Text style={styles.disclaimer}>
-            Al crear una cuenta aceptas nuestros{' '}
-            <Text style={styles.link}>Términos de uso</Text> y{' '}
-            <Text style={styles.link}>Política de privacidad</Text>.
-          </Text>
-
-          <Button
-            label="Crear mi cuenta"
-            variant="primary"
-            loading={isLoading}
-            onPress={handleSubmit(onSubmit)}
-            style={styles.submitBtn}
-          />
-
-          <View style={styles.loginRow}>
-            <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
-            <Button
-              label="Inicia sesión"
-              variant="ghost"
-              size="sm"
-              fullWidth={false}
-              onPress={onNavigateToLogin}
+            <Controller
+              control={control}
+              name="name"
+              render={({ field: { onChange, value, onBlur } }) => (
+                <Input
+                  label="Nombre"
+                  placeholder="Tu nombre"
+                  autoCapitalize="words"
+                  leftIcon="account-outline"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.name?.message}
+                />
+              )}
             />
-          </View>
+
+            <Controller
+              control={control}
+              name="email"
+              render={({ field: { onChange, value, onBlur } }) => (
+                <Input
+                  label="Email"
+                  placeholder="tu@email.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  leftIcon="email-outline"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.email?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, value, onBlur } }) => (
+                <Input
+                  label="Contraseña"
+                  placeholder="Mínimo 8 caracteres"
+                  isPassword
+                  leftIcon="lock-outline"
+                  hint="Incluye mayúsculas, minúsculas y números"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.password?.message}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="confirmPassword"
+              render={({ field: { onChange, value, onBlur } }) => (
+                <Input
+                  label="Confirmar contraseña"
+                  placeholder="Repite tu contraseña"
+                  isPassword
+                  leftIcon="shield-check-outline"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={errors.confirmPassword?.message}
+                />
+              )}
+            />
+
+            <Text style={[S.Typography.caption, { textAlign: 'center', marginBottom: Theme.space.lg }]}>
+              Al crear una cuenta aceptas nuestros{' '}
+              <Text style={S.Typography.linkSm}>Términos de uso</Text>
+              {' '}y{' '}
+              <Text style={S.Typography.linkSm}>Política de privacidad</Text>.
+            </Text>
+
+            <Button
+              label="Crear mi cuenta"
+              variant="primary"
+              loading={isLoading}
+              onPress={handleSubmit(onSubmit)}
+              icon="account-plus-outline"
+            />
+
+            <View style={[S.Layout.row, { justifyContent: 'center', marginTop: Theme.space.lg }]}>
+              <Text style={S.Typography.bodyMd}>¿Ya tienes cuenta? </Text>
+              <Pressable onPress={onNavigateToLogin}>
+                <Text style={S.Typography.link}>Inicia sesión</Text>
+              </Pressable>
+            </View>
+
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.backgroundMain },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 32,
-    paddingHorizontal: Spacing.screenHorizontal,
-    gap: 4,
-  },
-  backBtn: { marginBottom: Spacing[4] },
-  headerTitle: {
-    fontFamily: FontFamily.soraBold,
-    fontSize: FontSize['2xl'],
-    color: Colors.white,
-  },
-  headerSubtitle: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.base,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  body: { flex: 1 },
-  form: {
-    padding: Spacing.screenHorizontal,
-    paddingTop: Spacing[6],
-  },
-  errorBanner: {
-    backgroundColor: Colors.dangerLight,
-    borderRadius: BorderRadius.sm,
-    padding: Spacing[3],
-    marginBottom: Spacing[4],
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.danger,
-  },
-  errorBannerText: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.sm,
-    color: Colors.danger,
-  },
-  disclaimer: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.xs,
-    color: Colors.textLight,
-    textAlign: 'center',
-    marginBottom: Spacing[5],
-    lineHeight: FontSize.xs * 1.6,
-  },
-  link: {
-    color: Colors.primary,
-    fontFamily: FontFamily.dmSansMedium,
-  },
-  submitBtn: { marginBottom: Spacing[4] },
-  loginRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loginText: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.base,
-    color: Colors.textMedium,
-  },
-});

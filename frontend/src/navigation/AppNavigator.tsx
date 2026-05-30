@@ -1,26 +1,27 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Pressable,
-  Dimensions, Platform,
+  View,
+  Text,
+  Pressable,
+  Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, FontFamily, FontSize, Spacing, Shadows } from '../theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { S, Theme } from '../theme/style';
 
 // Pantallas
 import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
-import { GoalsScreen } from '../screens/goals/GoalsScreen';
-import { HistoryScreen } from '../screens/history/HistoryScreen';
+import GoalsScreen from '../screens/goals/GoalsScreen';
+import HistoryScreen from '../screens/history/HistoryScreen';
 import { ChartsScreen } from '../screens/charts/ChartsScreen';
 import { AccountScreen } from '../screens/account/AccountScreen';
-import { AddSavingScreen } from '../screens/savings/AddSavingScreen';
-import { SplitSavingScreen } from '../screens/split/SplitSavingScreen';
+import AddSavingScreen from '../screens/savings/AddSavingScreen';
+import SplitSavingScreen from '../screens/split/SplitSavingScreen';
 import { GoalDetailScreen } from '../screens/goals/GoalDetailScreen';
 import { CreateGoalScreen } from '../screens/goals/CreateGoalScreen';
 import { PrivacySecurityScreen } from '../screens/account/PrivacySecurityScreen';
 import { DeleteAccountScreen } from '../screens/account/DeleteAccountScreen';
 import { CurrencySettingsScreen } from '../screens/account/CurrencySettingsScreen';
-import type { Goal, Saving } from '../types';
+import type { Goal } from '../types';
 
 type Tab = 'dashboard' | 'goals' | 'history' | 'charts' | 'account';
 type ModalScreen =
@@ -32,12 +33,12 @@ type ModalScreen =
   | { name: 'deleteAccount' }
   | { name: 'currency' };
 
-const TABS: { key: Tab; icon: string; iconActive: string; label: string }[] = [
-  { key: 'dashboard', icon: 'home-outline', iconActive: 'home', label: 'Inicio' },
-  { key: 'goals', icon: 'flag-outline', iconActive: 'flag', label: 'Metas' },
-  { key: 'history', icon: 'time-outline', iconActive: 'time', label: 'Historial' },
-  { key: 'charts', icon: 'bar-chart-outline', iconActive: 'bar-chart', label: 'Gráficos' },
-  { key: 'account', icon: 'person-outline', iconActive: 'person', label: 'Cuenta' },
+const TABS: { key: Tab; icon: keyof typeof MaterialCommunityIcons.glyphMap; iconActive: keyof typeof MaterialCommunityIcons.glyphMap; label: string }[] = [
+  { key: 'dashboard', icon: 'home-outline',     iconActive: 'home',      label: 'Inicio'   },
+  { key: 'goals',     icon: 'flag-outline',      iconActive: 'flag',      label: 'Metas'    },
+  { key: 'history',   icon: 'history',           iconActive: 'history',   label: 'Historial'},
+  { key: 'charts',    icon: 'chart-bar',         iconActive: 'chart-bar', label: 'Gráficos' },
+  { key: 'account',   icon: 'account-outline',   iconActive: 'account',   label: 'Cuenta'   },
 ];
 
 interface AppNavigatorProps {
@@ -46,31 +47,29 @@ interface AppNavigatorProps {
 
 export const AppNavigator: React.FC<AppNavigatorProps> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-  const [modal, setModal] = useState<ModalScreen | null>(null);
+  const [modal, setModal]         = useState<ModalScreen | null>(null);
 
-  const goTo = useCallback((screen: ModalScreen) => setModal(screen), []);
+  const goTo   = useCallback((screen: ModalScreen) => setModal(screen), []);
   const goBack = useCallback(() => setModal(null), []);
 
-  // Modal stack — si hay modal activo lo muestra sobre los tabs
+  // Modal stack
   if (modal) {
     switch (modal.name) {
       case 'addSaving':
         return (
           <AddSavingScreen
-            onBack={goBack}
-            onSuccess={goBack}
-            onGoToSplit={() => setModal({ name: 'split' })}
+            navigation={{ goBack, navigate: (route: string) => { if (route === 'SplitSaving') setModal({ name: 'split' }); } }}
           />
         );
       case 'split':
-        return <SplitSavingScreen onBack={goBack} onSuccess={goBack} />;
+        return <SplitSavingScreen navigation={{ goBack }} route={{ params: {} } as any} />;
       case 'goalDetail':
         return (
           <GoalDetailScreen
-            goal={modal.goal}
+            goal={modal.goal as any}
             onBack={goBack}
-            onEdit={(g) => setModal({ name: 'goalDetail', goal: g })}
-            onAddSaving={(goalId) => setModal({ name: 'addSaving', goalId })}
+            onEdit={(g: any) => setModal({ name: 'goalDetail', goal: g })}
+            onAddSaving={(goalId: string) => setModal({ name: 'addSaving', goalId })}
           />
         );
       case 'createGoal':
@@ -112,15 +111,16 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ onLogout }) => {
       case 'goals':
         return (
           <GoalsScreen
-            onCreateGoal={() => goTo({ name: 'createGoal' })}
-            onGoalDetail={(goal) => goTo({ name: 'goalDetail', goal })}
+            navigation={{ navigate: (screen: string, params?: any) => {
+              if (screen === 'GoalDetail') goTo({ name: 'goalDetail', goal: params?.goal || { id: '1' } });
+              if (screen === 'CreateGoal') goTo({ name: 'createGoal' });
+            } }}
           />
         );
       case 'history':
         return (
           <HistoryScreen
-            onSavingDetail={() => {}}
-            onAddSaving={() => goTo({ name: 'addSaving' })}
+            navigation={{ navigate: (route: string) => { if (route === 'AddSaving') goTo({ name: 'addSaving' }); } }}
           />
         );
       case 'charts':
@@ -128,37 +128,37 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ onLogout }) => {
       case 'account':
         return (
           <AccountScreen
-            onNavigateToPrivacy={() => goTo({ name: 'privacy' })}
-            onNavigateToCurrency={() => goTo({ name: 'currency' })}
-            onLogout={onLogout}
+            navigation={{ navigate: (screen: string) => {
+              if (screen === 'Privacy')       goTo({ name: 'privacy' });
+              if (screen === 'DeleteAccount') goTo({ name: 'deleteAccount' });
+            }, reset: onLogout }}
           />
         );
     }
   };
 
   return (
-    <View style={styles.root}>
-      <View style={styles.content}>{renderTab()}</View>
+    <View style={[S.Layout.screen, { backgroundColor: Theme.color.bgMain }]}>
+      {/* Tab content */}
+      <View style={S.Layout.flex1}>{renderTab()}</View>
 
       {/* Bottom Tab Bar */}
-      <View style={styles.tabBar}>
-        {TABS.map((tab) => {
+      <View style={S.Navbar.container}>
+        {TABS.map(tab => {
           const isActive = activeTab === tab.key;
           return (
             <Pressable
               key={tab.key}
-              style={styles.tabItem}
+              style={S.Navbar.item}
               onPress={() => setActiveTab(tab.key)}
             >
-              {isActive && (
-                <View style={styles.activeIndicator} />
-              )}
-              <Ionicons
-                name={(isActive ? tab.iconActive : tab.icon) as any}
+              {isActive && <View style={S.Navbar.activeDot} />}
+              <MaterialCommunityIcons
+                name={isActive ? tab.iconActive : tab.icon}
                 size={24}
-                color={isActive ? Colors.primary : Colors.textLight}
+                color={isActive ? Theme.color.primary : Theme.color.gray300}
               />
-              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+              <Text style={[S.Navbar.label, isActive && S.Navbar.labelActive]}>
                 {tab.label}
               </Text>
             </Pressable>
@@ -168,39 +168,3 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ onLogout }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.backgroundMain },
-  content: { flex: 1 },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: Colors.white,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 8,
-    paddingTop: 8,
-    ...Shadows.tabBar,
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
-  },
-  activeIndicator: {
-    position: 'absolute',
-    top: -8,
-    width: 32,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: Colors.primary,
-  },
-  tabLabel: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: 10,
-    color: Colors.textLight,
-  },
-  tabLabelActive: {
-    fontFamily: FontFamily.dmSansSemiBold,
-    color: Colors.primary,
-  },
-});

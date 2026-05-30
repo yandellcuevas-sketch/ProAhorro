@@ -1,19 +1,16 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
-  Pressable,
+  View,
   Text,
-  StyleSheet,
+  Pressable,
   ActivityIndicator,
   PressableProps,
+  Animated,
 } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated';
-import { Colors, FontFamily, FontSize, BorderRadius, Shadows } from '../../theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { S, Theme } from '../../theme/style';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';
+type ButtonVariant = 'primary' | 'primaryLg' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'dangerGhost';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends PressableProps {
@@ -22,10 +19,9 @@ interface ButtonProps extends PressableProps {
   size?: ButtonSize;
   loading?: boolean;
   fullWidth?: boolean;
-  icon?: React.ReactNode;
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
+  iconRight?: keyof typeof MaterialCommunityIcons.glyphMap;
 }
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const Button: React.FC<ButtonProps> = ({
   label,
@@ -34,96 +30,96 @@ export const Button: React.FC<ButtonProps> = ({
   loading = false,
   fullWidth = true,
   icon,
+  iconRight,
   disabled,
   onPress,
+  style,
   ...props
 }) => {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.97, { damping: 15 });
+    Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true, speed: 50 }).start();
   };
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15 });
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 50 }).start();
+  };
+
+  const handlePress = (e: any) => {
+    onPress?.(e);
   };
 
   const isDisabled = disabled || loading;
 
+  const containerStyle = {
+    primary: S.Buttons.primary,
+    primaryLg: S.Buttons.primaryLg,
+    secondary: S.Buttons.secondary,
+    outline: S.Buttons.outline,
+    ghost: S.Buttons.ghost,
+    danger: S.Buttons.danger,
+    dangerGhost: S.Buttons.dangerGhost,
+  }[variant];
+
+  const textStyle = {
+    primary: S.Buttons.primaryText,
+    primaryLg: S.Buttons.primaryText,
+    secondary: S.Buttons.secondaryText,
+    outline: S.Buttons.outlineText,
+    ghost: S.Buttons.ghostText,
+    danger: S.Buttons.dangerText,
+    dangerGhost: S.Buttons.dangerGhostText,
+  }[variant];
+
+  const iconColor = {
+    primary: Theme.color.white,
+    primaryLg: Theme.color.white,
+    secondary: Theme.color.primaryDark,
+    outline: Theme.color.primary,
+    ghost: Theme.color.textDark,
+    danger: Theme.color.white,
+    dangerGhost: Theme.color.danger,
+  }[variant];
+
+  const sizeOverride =
+    size === 'sm' ? { paddingVertical: 10, paddingHorizontal: 16 } :
+    size === 'lg' ? { paddingVertical: 18, paddingHorizontal: 32 } :
+    undefined;
+
   return (
-    <AnimatedPressable
-      style={[
-        styles.base,
-        styles[`size_${size}`],
-        styles[`variant_${variant}`],
-        fullWidth && styles.fullWidth,
-        isDisabled && styles.disabled,
-        variant === 'primary' && Shadows.button,
-        variant === 'danger' && Shadows.buttonDanger,
-        animatedStyle,
-      ]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={isDisabled}
-      {...props}
-    >
-      {loading ? (
-        <ActivityIndicator
-          color={variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.white}
-          size="small"
-        />
-      ) : (
-        <>
-          {icon && icon}
-          <Text style={[styles.label, styles[`label_${variant}`], styles[`labelSize_${size}`]]}>
-            {label}
-          </Text>
-        </>
-      )}
-    </AnimatedPressable>
+    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, fullWidth && { width: '100%' }]}>
+      <Pressable
+        {...props}
+        style={({ pressed }) => [
+          containerStyle,
+          sizeOverride,
+          isDisabled && S.Buttons.disabled,
+          typeof style === 'function' ? style({ pressed }) : style,
+        ]}
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={isDisabled}
+      >
+        {loading ? (
+          <ActivityIndicator
+            color={variant === 'outline' || variant === 'ghost' || variant === 'dangerGhost'
+              ? Theme.color.primary
+              : Theme.color.white}
+            size="small"
+          />
+        ) : (
+          <>
+            {icon && (
+              <MaterialCommunityIcons name={icon} size={size === 'sm' ? 16 : 20} color={iconColor} />
+            )}
+            <Text style={textStyle}>{label}</Text>
+            {iconRight && (
+              <MaterialCommunityIcons name={iconRight} size={size === 'sm' ? 16 : 20} color={iconColor} />
+            )}
+          </>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 };
-
-const styles = StyleSheet.create({
-  base: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: BorderRadius.button,
-  },
-  fullWidth: { width: '100%' },
-  disabled: { opacity: 0.5 },
-
-  // Sizes
-  size_sm: { height: 40, paddingHorizontal: 16 },
-  size_md: { height: 52, paddingHorizontal: 24 },
-  size_lg: { height: 60, paddingHorizontal: 32 },
-
-  // Variants
-  variant_primary: { backgroundColor: Colors.primary },
-  variant_secondary: { backgroundColor: Colors.primaryDark },
-  variant_outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-  },
-  variant_danger: { backgroundColor: Colors.danger },
-  variant_ghost: { backgroundColor: 'transparent' },
-
-  // Labels
-  label: { fontFamily: FontFamily.dmSansSemiBold },
-  label_primary: { color: Colors.white },
-  label_secondary: { color: Colors.white },
-  label_outline: { color: Colors.primary },
-  label_danger: { color: Colors.white },
-  label_ghost: { color: Colors.primary },
-
-  labelSize_sm: { fontSize: FontSize.sm },
-  labelSize_md: { fontSize: FontSize.base },
-  labelSize_lg: { fontSize: FontSize.md },
-});

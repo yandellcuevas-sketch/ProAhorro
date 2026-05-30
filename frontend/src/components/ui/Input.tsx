@@ -4,66 +4,69 @@ import {
   TextInput,
   Text,
   Pressable,
-  StyleSheet,
   TextInputProps,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, FontFamily, FontSize, BorderRadius, Spacing, Shadows } from '../../theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { S, Theme } from '../../theme/style';
 
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   hint?: string;
-  leftIcon?: keyof typeof Ionicons.glyphMap;
-  rightIcon?: keyof typeof Ionicons.glyphMap;
+  leftIcon?: keyof typeof MaterialCommunityIcons.glyphMap;
+  rightIcon?: keyof typeof MaterialCommunityIcons.glyphMap;
   onRightIconPress?: () => void;
   isPassword?: boolean;
 }
 
-export const Input = forwardRef<TextInput, InputProps>(({
-  label,
-  error,
-  hint,
-  leftIcon,
-  rightIcon,
-  onRightIconPress,
-  isPassword = false,
-  value,
-  ...props
-}, ref) => {
+export const Input = forwardRef<TextInput, InputProps>((
+  {
+    label,
+    error,
+    hint,
+    leftIcon,
+    rightIcon,
+    onRightIconPress,
+    isPassword = false,
+    value,
+    ...props
+  },
+  ref,
+) => {
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const hasError = !!error;
 
-  return (
-    <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+  const wrapStyle = hasError
+    ? S.Forms.inputWrapError
+    : isFocused
+    ? S.Forms.inputWrapFocused
+    : S.Forms.inputWrap;
 
-      <View
-        style={[
-          styles.inputWrapper,
-          isFocused && styles.inputWrapperFocused,
-          hasError && styles.inputWrapperError,
-        ]}
-      >
+  const iconColor = hasError
+    ? Theme.color.danger
+    : isFocused
+    ? Theme.color.primary
+    : Theme.color.textPlaceholder;
+
+  return (
+    <View style={S.Forms.group}>
+      {label && <Text style={S.Typography.label}>{label}</Text>}
+
+      <View style={wrapStyle}>
         {leftIcon && (
-          <Ionicons
+          <MaterialCommunityIcons
             name={leftIcon}
-            size={20}
-            color={hasError ? Colors.danger : isFocused ? Colors.primary : Colors.textLight}
-            style={styles.leftIcon}
+            size={19}
+            color={iconColor}
           />
         )}
 
         <TextInput
           ref={ref}
-          style={[
-            styles.input,
-            leftIcon ? styles.inputWithLeft : null,
-            (rightIcon || isPassword) ? styles.inputWithRight : null,
-          ]}
-          placeholderTextColor={Colors.textLight}
+          style={S.Forms.input}
+          placeholderTextColor={Theme.color.textPlaceholder}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           secureTextEntry={isPassword && !showPassword}
@@ -74,100 +77,35 @@ export const Input = forwardRef<TextInput, InputProps>(({
         {isPassword && (
           <Pressable
             onPress={() => setShowPassword(!showPassword)}
-            style={styles.rightIconBtn}
             hitSlop={8}
           >
-            <Ionicons
+            <MaterialCommunityIcons
               name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-              size={20}
-              color={Colors.textLight}
+              size={19}
+              color={Theme.color.textPlaceholder}
             />
           </Pressable>
         )}
 
         {rightIcon && !isPassword && (
-          <Pressable
-            onPress={onRightIconPress}
-            style={styles.rightIconBtn}
-            hitSlop={8}
-          >
-            <Ionicons name={rightIcon} size={20} color={Colors.textLight} />
+          <Pressable onPress={onRightIconPress} hitSlop={8}>
+            <MaterialCommunityIcons name={rightIcon} size={19} color={Theme.color.textPlaceholder} />
           </Pressable>
         )}
       </View>
 
       {hasError && (
-        <View style={styles.errorRow}>
-          <Ionicons name="alert-circle-outline" size={14} color={Colors.danger} />
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={S.Layout.row}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={13} color={Theme.color.danger} />
+          <Text style={[S.Forms.errorText, { marginTop: 0, marginLeft: 4 }]}>{error}</Text>
         </View>
       )}
 
       {hint && !hasError && (
-        <Text style={styles.hintText}>{hint}</Text>
+        <Text style={S.Forms.helperText}>{hint}</Text>
       )}
     </View>
   );
 });
 
 Input.displayName = 'Input';
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: Spacing[4],
-  },
-  label: {
-    fontFamily: FontFamily.dmSansMedium,
-    fontSize: FontSize.sm,
-    color: Colors.textDark,
-    marginBottom: Spacing[2],
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: Spacing.inputHeight,
-    backgroundColor: Colors.backgroundInput,
-    borderRadius: BorderRadius.input,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    ...Shadows.xs,
-  },
-  inputWrapperFocused: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.white,
-  },
-  inputWrapperError: {
-    borderColor: Colors.danger,
-    backgroundColor: Colors.dangerLight,
-  },
-  input: {
-    flex: 1,
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.base,
-    color: Colors.textDark,
-    paddingHorizontal: Spacing[4],
-    height: '100%',
-  },
-  inputWithLeft: { paddingLeft: 8 },
-  inputWithRight: { paddingRight: 8 },
-  leftIcon: { marginLeft: Spacing[3] },
-  rightIconBtn: { paddingHorizontal: Spacing[3] },
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: Spacing[1],
-  },
-  errorText: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.xs,
-    color: Colors.danger,
-    flex: 1,
-  },
-  hintText: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.xs,
-    color: Colors.textLight,
-    marginTop: Spacing[1],
-  },
-});

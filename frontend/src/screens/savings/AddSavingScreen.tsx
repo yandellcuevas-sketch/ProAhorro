@@ -1,260 +1,226 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, StatusBar } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Colors, FontFamily, FontSize, Spacing, BorderRadius, Shadows } from '../../theme';
-import { addSavingSchema, type AddSavingFormData } from '../../validations/saving.schema';
-import { savingsService } from '../../services/savingsService';
-import { SAVING_METHODS, SAVING_DESTINATIONS } from '../../constants';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StatusBar,
+  Animated,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { S, Theme } from '../../theme/style';
 
-interface AddSavingScreenProps {
-  onBack: () => void;
-  onSuccess: () => void;
-  onGoToSplit: () => void;
-}
+type Method     = 'cash' | 'transfer' | 'card' | 'other';
+type Destination = 'free' | 'goal' | 'split' | 'new';
+type Currency   = 'DOP' | 'USD' | 'EUR';
 
-export const AddSavingScreen: React.FC<AddSavingScreenProps> = ({
-  onBack,
-  onSuccess,
-  onGoToSplit,
-}) => {
-  const { control, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } =
-    useForm<AddSavingFormData>({
-      resolver: zodResolver(addSavingSchema),
-      defaultValues: {
-        amount: '',
-        currency: 'DOP',
-        date: new Date().toISOString().split('T')[0],
-        method: 'cash',
-        note: '',
-        destination: 'free',
-      },
-    });
+const METHODS: { key: Method; icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string }[] = [
+  { key: 'cash',     icon: 'cash',               label: 'Efectivo'      },
+  { key: 'transfer', icon: 'bank-transfer',       label: 'Transferencia' },
+  { key: 'card',     icon: 'credit-card-outline', label: 'Tarjeta'       },
+  { key: 'other',    icon: 'dots-horizontal',     label: 'Otro'          },
+];
 
-  const destination = watch('destination');
+const CURRENCIES: { key: Currency; symbol: string }[] = [
+  { key: 'DOP', symbol: 'RD$' },
+  { key: 'USD', symbol: 'US$' },
+  { key: 'EUR', symbol: '€'   },
+];
 
-  const onSubmit = async (data: AddSavingFormData) => {
-    if (data.destination === 'split') {
-      onGoToSplit();
-      return;
-    }
-    await savingsService.createSaving({
-      amount: parseFloat(data.amount),
-      currency: data.currency,
-      date: data.date,
-      method: data.method,
-      note: data.note,
-      type: data.destination === 'free' ? 'free' : 'goal',
-      goal_id: data.goal_id,
-    });
-    onSuccess();
-  };
+const DESTINATIONS: { key: Destination; icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; desc: string }[] = [
+  { key: 'free',  icon: 'piggy-bank-outline',  label: 'Ahorro libre', desc: 'Sin meta asignada'     },
+  { key: 'goal',  icon: 'bullseye-arrow',       label: 'Una meta',     desc: 'Asignar a una meta'    },
+  { key: 'split', icon: 'arrow-split-vertical', label: 'Repartir',     desc: 'Entre varias metas'    },
+  { key: 'new',   icon: 'flag-outline',         label: 'Nueva meta',   desc: 'Crear y asignar ahora' },
+];
+
+const AddSavingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const [amount, setAmount]                 = useState('');
+  const [currency, setCurrency]             = useState<Currency>('DOP');
+  const [method, setMethod]                 = useState<Method>('cash');
+  const [destination, setDestination]       = useState<Destination>('free');
+  const [note, setNote]                     = useState('');
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, friction: 9, tension: 60, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  const currentSymbol = CURRENCIES.find(c => c.key === currency)?.symbol ?? 'RD$';
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={[Colors.primaryDeep, Colors.primaryDark]} style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={onBack}>
-          <Ionicons name="arrow-back" size={24} color={Colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Agregar ahorro</Text>
-        <Text style={styles.headerSubtitle}>¿Cuánto guardaste hoy?</Text>
-      </LinearGradient>
+    <KeyboardAvoidingView
+      style={S.Layout.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor={Theme.color.bgMain} />
 
-      <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-        <Controller
-          control={control}
-          name="amount"
-          render={({ field: { onChange, value } }) => (
-            <Input
-              label="Monto"
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-              leftIcon="cash-outline"
-              value={value}
-              onChangeText={onChange}
-              error={errors.amount?.message}
-            />
-          )}
-        />
+      {/* Header */}
+      <View style={S.Layout.header}>
+        <TouchableOpacity style={S.Layout.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="chevron-left" size={24} color={Theme.color.textDark} />
+        </TouchableOpacity>
+        <Text style={S.Layout.headerTitle}>Nuevo ahorro</Text>
+        <View style={{ width: 40 }} />
+      </View>
 
-        {/* Moneda */}
-        <Text style={styles.label}>Moneda</Text>
-        <View style={styles.chipsRow}>
-          {['DOP', 'USD', 'EUR'].map((c) => (
-            <Controller key={c} control={control} name="currency"
-              render={({ field: { value, onChange } }) => (
-                <Pressable
-                  style={[styles.chip, value === c && styles.chipSelected]}
-                  onPress={() => onChange(c)}
-                >
-                  <Text style={[styles.chipText, value === c && styles.chipTextSelected]}>{c}</Text>
-                </Pressable>
-              )}
-            />
-          ))}
-        </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={S.Layout.scrollPad}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
-        {/* Método */}
-        <Text style={styles.label}>Método</Text>
-        <View style={styles.chipsRow}>
-          {SAVING_METHODS.map((m) => (
-            <Controller key={m.value} control={control} name="method"
-              render={({ field: { value, onChange } }) => (
-                <Pressable
-                  style={[styles.chip, value === m.value && styles.chipSelected]}
-                  onPress={() => onChange(m.value)}
-                >
-                  <Ionicons
-                    name={m.icon as any}
-                    size={14}
-                    color={value === m.value ? Colors.white : Colors.textMedium}
-                  />
-                  <Text style={[styles.chipText, value === m.value && styles.chipTextSelected]}>
-                    {m.label}
-                  </Text>
-                </Pressable>
-              )}
-            />
-          ))}
-        </View>
+          {/* ─── MONTO ─── */}
+          <View style={[S.Cards.amountInput, { marginBottom: Theme.space.lg }]}>
+            <Text style={[S.Typography.label, { color: Theme.color.primaryDark, marginBottom: Theme.space.sm }]}>
+              ¿Cuánto ahorraste hoy?
+            </Text>
+            <View style={[S.Layout.row, { gap: 8 }]}>
+              <Text style={S.Forms.amountSymbol}>{currentSymbol}</Text>
+              <TextInput
+                style={S.Forms.amountField}
+                placeholder="0.00"
+                placeholderTextColor={Theme.color.borderMid}
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="decimal-pad"
+              />
+              <TouchableOpacity
+                style={S.Forms.amountCurrencyPill}
+                onPress={() => setShowCurrencyPicker(!showCurrencyPicker)}
+                activeOpacity={0.7}
+              >
+                <Text style={S.Forms.amountCurrencyPillText}>{currency}</Text>
+                <MaterialCommunityIcons name="chevron-down" size={14} color={Theme.color.primary} />
+              </TouchableOpacity>
+            </View>
 
-        {/* Destino */}
-        <Text style={styles.label}>¿Adónde va este ahorro?</Text>
-        <View style={styles.destinationGrid}>
-          {SAVING_DESTINATIONS.map((d) => (
-            <Controller key={d.value} control={control} name="destination"
-              render={({ field: { value, onChange } }) => (
-                <Pressable
-                  style={[styles.destCard, value === d.value && styles.destCardSelected]}
-                  onPress={() => onChange(d.value)}
-                >
-                  <Ionicons
-                    name={d.icon as any}
+            {/* Currency picker inline */}
+            {showCurrencyPicker && (
+              <View style={[S.Cards.listSection, { marginTop: Theme.space.sm }]}>
+                {CURRENCIES.map((c, i) => (
+                  <TouchableOpacity
+                    key={c.key}
+                    style={[
+                      S.ListItems.row,
+                      i < CURRENCIES.length - 1 && S.ListItems.rowBorder,
+                      currency === c.key && { backgroundColor: Theme.color.primaryLighter },
+                    ]}
+                    onPress={() => { setCurrency(c.key); setShowCurrencyPicker(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[S.ListItems.rowLabel, currency === c.key && { color: Theme.color.primary }]}>
+                      {c.symbol}  {c.key}
+                    </Text>
+                    {currency === c.key && (
+                      <MaterialCommunityIcons name="check" size={18} color={Theme.color.primary} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* ─── MÉTODO ─── */}
+          <Text style={[S.Typography.label, { marginBottom: Theme.space.sm }]}>Método</Text>
+          <View style={[S.Layout.rowWrap, { marginBottom: Theme.space.lg }]}>
+            {METHODS.map(m => (
+              <TouchableOpacity
+                key={m.key}
+                style={method === m.key ? S.Chips.methodActive : S.Chips.method}
+                onPress={() => setMethod(m.key)}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons
+                  name={m.icon}
+                  size={16}
+                  color={method === m.key ? Theme.color.white : Theme.color.textMedium}
+                />
+                <Text style={method === m.key ? S.Chips.methodTextActive : S.Chips.methodText}>
+                  {m.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* ─── DESTINO ─── */}
+          <Text style={[S.Typography.label, { marginBottom: Theme.space.sm }]}>Destino del ahorro</Text>
+          <View style={[S.DestinationPicker.grid, { marginBottom: Theme.space.lg }]}>
+            {DESTINATIONS.map(d => (
+              <TouchableOpacity
+                key={d.key}
+                style={[
+                  S.DestinationPicker.option,
+                  destination === d.key && S.DestinationPicker.optionActive,
+                ]}
+                onPress={() => setDestination(d.key)}
+                activeOpacity={0.75}
+              >
+                <View style={[
+                  S.DestinationPicker.iconWrap,
+                  destination === d.key && S.DestinationPicker.iconWrapActive,
+                ]}>
+                  <MaterialCommunityIcons
+                    name={d.icon}
                     size={22}
-                    color={value === d.value ? Colors.primary : Colors.textMedium}
+                    color={destination === d.key ? Theme.color.primary : Theme.color.textMuted}
                   />
-                  <Text style={[styles.destLabel, value === d.value && styles.destLabelSelected]}>
-                    {d.label}
-                  </Text>
-                </Pressable>
-              )}
-            />
-          ))}
-        </View>
+                </View>
+                <Text style={[
+                  S.DestinationPicker.label,
+                  destination === d.key && S.DestinationPicker.labelActive,
+                ]}>
+                  {d.label}
+                </Text>
+                <Text style={S.DestinationPicker.desc}>{d.desc}</Text>
+                {destination === d.key && (
+                  <View style={S.DestinationPicker.checkmark}>
+                    <MaterialCommunityIcons name="check" size={11} color={Theme.color.white} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
 
-        <Controller
-          control={control}
-          name="note"
-          render={({ field: { onChange, value } }) => (
-            <Input
-              label="Nota (opcional)"
-              placeholder="¿De dónde viene este ahorro?"
-              value={value}
-              onChangeText={onChange}
+          {/* ─── NOTA ─── */}
+          <Text style={[S.Typography.label, { marginBottom: Theme.space.sm }]}>
+            Nota{' '}
+            <Text style={[S.Typography.muted, { fontFamily: Theme.font.dmSansRegular }]}>(opcional)</Text>
+          </Text>
+          <View style={[S.Forms.textareaWrap, { marginBottom: Theme.space.xl }]}>
+            <MaterialCommunityIcons name="pencil-outline" size={16} color={Theme.color.textPlaceholder} style={{ marginTop: 2 }} />
+            <TextInput
+              style={S.Forms.textarea}
+              placeholder="Ej: Sueldo de mayo, vuelto del mercado..."
+              placeholderTextColor={Theme.color.textPlaceholder}
+              value={note}
+              onChangeText={setNote}
               multiline
+              numberOfLines={3}
             />
-          )}
-        />
+          </View>
 
-        <Button
-          label={destination === 'split' ? 'Ir a repartir' : 'Guardar ahorro'}
-          variant="primary"
-          loading={isSubmitting}
-          onPress={handleSubmit(onSubmit)}
-          style={styles.saveBtn}
-        />
-        <View style={{ height: 40 }} />
+          {/* ─── GUARDAR ─── */}
+          <TouchableOpacity style={S.Buttons.primaryLg} activeOpacity={0.85}>
+            <MaterialCommunityIcons name="check-circle-outline" size={20} color={Theme.color.white} />
+            <Text style={S.Buttons.primaryText}>Guardar ahorro</Text>
+          </TouchableOpacity>
+
+          <View style={{ height: Theme.space.xl }} />
+        </Animated.View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.backgroundMain },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 28,
-    paddingHorizontal: Spacing.screenHorizontal,
-    gap: 4,
-  },
-  backBtn: { marginBottom: Spacing[3] },
-  headerTitle: {
-    fontFamily: FontFamily.soraBold,
-    fontSize: FontSize.xl,
-    color: Colors.white,
-  },
-  headerSubtitle: {
-    fontFamily: FontFamily.dmSansRegular,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  form: { padding: Spacing.screenHorizontal, paddingTop: Spacing[5] },
-  label: {
-    fontFamily: FontFamily.dmSansMedium,
-    fontSize: FontSize.sm,
-    color: Colors.textDark,
-    marginBottom: Spacing[2],
-    marginTop: Spacing[2],
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing[2],
-    marginBottom: Spacing[4],
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: Spacing[3],
-    paddingVertical: Spacing[2],
-    borderRadius: BorderRadius.full,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.white,
-  },
-  chipSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primary,
-  },
-  chipText: {
-    fontFamily: FontFamily.dmSansMedium,
-    fontSize: FontSize.sm,
-    color: Colors.textMedium,
-  },
-  chipTextSelected: { color: Colors.white },
-  destinationGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing[3],
-    marginBottom: Spacing[4],
-  },
-  destCard: {
-    width: '47%',
-    padding: Spacing[4],
-    borderRadius: BorderRadius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.white,
-    alignItems: 'center',
-    gap: Spacing[2],
-    ...Shadows.xs,
-  },
-  destCardSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primarySoft,
-  },
-  destLabel: {
-    fontFamily: FontFamily.dmSansMedium,
-    fontSize: FontSize.sm,
-    color: Colors.textMedium,
-    textAlign: 'center',
-  },
-  destLabelSelected: { color: Colors.primary },
-  saveBtn: { marginTop: Spacing[4] },
-});
+export default AddSavingScreen;

@@ -1,279 +1,224 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, Pressable,
-  TextInput, Alert, StatusBar, ActivityIndicator,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StatusBar,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Card } from '../../components/ui/Card';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { S, Theme } from '../../theme/style';
 import { ProgressBar } from '../../components/ui/ProgressBar';
-import { Colors, FontFamily, FontSize, Spacing, BorderRadius, Shadows } from '../../theme';
-import { splitService } from '../../services/splitService';
-import { useGoalsStore } from '../../store/goalsStore';
-import { formatAmount, todayISO } from '../../utils/format';
-import { SAVING_METHODS } from '../../constants';
-import type { Goal, SavingMethod } from '../../types';
 
-interface SplitItem {
-  goal: Goal;
-  amount: string;
+interface GoalSplit {
+  id: string;
+  name: string;
+  icon: string;
+  iconColor: string;
+  currency: string;
+  assigned: string;
 }
 
-interface SplitSavingScreenProps {
-  onBack: () => void;
-  onSuccess: () => void;
-}
+const AVAILABLE_GOALS: GoalSplit[] = [
+  { id: '1', name: 'Viaje a Europa',   icon: 'airplane',             iconColor: '#1976D2', currency: 'RD$', assigned: '' },
+  { id: '2', name: 'Carro nuevo',      icon: 'car-outline',          iconColor: '#7B1FA2', currency: 'RD$', assigned: '' },
+  { id: '3', name: 'Fondo emergencia', icon: 'shield-check-outline', iconColor: '#00796B', currency: 'RD$', assigned: '' },
+  { id: '4', name: 'Laptop nueva',     icon: 'laptop',               iconColor: '#E65100', currency: 'RD$', assigned: '' },
+];
 
-export const SplitSavingScreen: React.FC<SplitSavingScreenProps> = ({ onBack, onSuccess }) => {
-  const { goals, fetchGoals } = useGoalsStore();
-  const [totalStr, setTotalStr] = useState('');
-  const [currency, setCurrency] = useState('DOP');
-  const [method, setMethod] = useState<SavingMethod>('transfer');
-  const [note, setNote] = useState('');
-  const [splits, setSplits] = useState<SplitItem[]>([]);
-  const [leftoverAsFree, setLeftoverAsFree] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+const SplitSavingScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
+  const totalAmount: number = route?.params?.totalAmount ?? 2000;
+  const currency = route?.params?.currency ?? 'RD$';
 
-  useEffect(() => { fetchGoals('active'); }, []);
+  const [goals, setGoals]           = useState<GoalSplit[]>(AVAILABLE_GOALS);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [freeAmount, setFreeAmount]   = useState('');
 
-  const total = parseFloat(totalStr) || 0;
-  const distributed = splits.reduce((s, item) => s + (parseFloat(item.amount) || 0), 0);
-  const leftover = Math.max(0, total - distributed);
-  const progress = total > 0 ? Math.min(100, (distributed / total) * 100) : 0;
-  const isOver = distributed > total;
-
-  const activeGoals = goals.filter(
-    (g) => g.status === 'active' && !splits.find((s) => s.goal.id === g.id)
-  );
-
-  const addGoal = (goal: Goal) => {
-    setSplits((prev) => [...prev, { goal, amount: '' }]);
-  };
-
-  const removeGoal = (goalId: string) => {
-    setSplits((prev) => prev.filter((s) => s.goal.id !== goalId));
-  };
-
-  const updateAmount = (goalId: string, value: string) => {
-    setSplits((prev) =>
-      prev.map((s) => (s.goal.id === goalId ? { ...s, amount: value } : s))
+  const toggleGoal = (id: string) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
     );
   };
 
-  const handleSubmit = async () => {
-    if (total <= 0) {
-      Alert.alert('Monto inválido', 'Ingresa un monto total mayor a 0.');
-      return;
-    }
-    if (splits.length === 0) {
-      Alert.alert('Sin metas', 'Agrega al menos una meta a repartir.');
-      return;
-    }
-    if (isOver) {
-      Alert.alert(
-        'Total excedido',
-        `El total repartido (${formatAmount(distributed, currency)}) supera el monto disponible (${formatAmount(total, currency)}). Ajusta la distribución.`
-      );
-      return;
-    }
+  const updateAssigned = useCallback((id: string, value: string) => {
+    setGoals(prev => prev.map(g => (g.id === id ? { ...g, assigned: value } : g)));
+  }, []);
 
-    setSubmitting(true);
-    try {
-      await splitService.createSplitSaving({
-        total_amount: total,
-        currency,
-        date: todayISO(),
-        method,
-        note: note || undefined,
-        splits: splits.map((s) => ({
-          goal_id: s.goal.id,
-          goal_name: s.goal.name,
-          goal_icon: s.goal.icon,
-          goal_color: s.goal.color,
-          amount: parseFloat(s.amount) || 0,
-        })).filter((s) => s.amount > 0),
-        leftover_as_free: leftoverAsFree && leftover > 0,
-        leftover_amount: leftover,
-      });
-      onSuccess();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const assignedTotal    = goals.filter(g => selectedIds.includes(g.id)).reduce((acc, g) => acc + (parseFloat(g.assigned) || 0), 0);
+  const freeVal          = parseFloat(freeAmount) || 0;
+  const totalDistributed = assignedTotal + freeVal;
+  const remaining        = totalAmount - totalDistributed;
+  const progressRatio    = Math.min(totalDistributed / totalAmount, 1);
+  const isOver           = totalDistributed > totalAmount;
+  const isComplete       = Math.abs(remaining) < 0.01;
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={[Colors.primaryDeep, Colors.primaryDark]} style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={onBack}>
-          <Ionicons name="arrow-back" size={24} color={Colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Repartir ahorro</Text>
-        <Text style={styles.headerSub}>Divide un monto entre varias metas</Text>
-      </LinearGradient>
+    <KeyboardAvoidingView
+      style={S.Layout.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor={Theme.color.bgMain} />
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {/* Header */}
+      <View style={S.Layout.header}>
+        <TouchableOpacity style={S.Layout.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="chevron-left" size={24} color={Theme.color.textDark} />
+        </TouchableOpacity>
+        <Text style={S.Layout.headerTitle}>Repartir ahorro</Text>
+        <View style={{ width: 40 }} />
+      </View>
 
-        {/* Monto total */}
-        <Input
-          label="Monto total a repartir"
-          placeholder="0.00"
-          keyboardType="decimal-pad"
-          leftIcon="cash-outline"
-          value={totalStr}
-          onChangeText={setTotalStr}
-        />
+      <ScrollView
+        contentContainerStyle={S.Layout.scrollPad}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
 
-        {/* Moneda */}
-        <Text style={styles.label}>Moneda</Text>
-        <View style={styles.chips}>
-          {['DOP', 'USD', 'EUR'].map((c) => (
-            <Pressable key={c} style={[styles.chip, currency === c && styles.chipSel]} onPress={() => setCurrency(c)}>
-              <Text style={[styles.chipTxt, currency === c && styles.chipTxtSel]}>{c}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Método */}
-        <Text style={styles.label}>Método</Text>
-        <View style={styles.chips}>
-          {SAVING_METHODS.map((m) => (
-            <Pressable key={m.value} style={[styles.chip, method === m.value && styles.chipSel]} onPress={() => setMethod(m.value as SavingMethod)}>
-              <Ionicons name={m.icon as any} size={13} color={method === m.value ? Colors.white : Colors.textMedium} />
-              <Text style={[styles.chipTxt, method === m.value && styles.chipTxtSel]}>{m.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Barra de progreso de distribución */}
-        {total > 0 && (
-          <Card style={styles.progressCard}>
-            <View style={styles.progressRow}>
-              <Text style={styles.progressLabel}>Repartido</Text>
-              <Text style={[styles.progressValue, isOver && { color: Colors.danger }]}>
-                {formatAmount(distributed, currency)} / {formatAmount(total, currency)}
-              </Text>
-            </View>
-            <ProgressBar progress={progress} color={isOver ? Colors.danger : Colors.primary} showPercentage={false} height={10} />
-            <View style={styles.progressRow}>
-              <Text style={styles.leftoverLabel}>Pendiente</Text>
-              <Text style={[styles.leftoverValue, isOver && { color: Colors.danger }]}>
-                {isOver ? `Excedido ${formatAmount(distributed - total, currency)}` : formatAmount(leftover, currency)}
-              </Text>
-            </View>
-          </Card>
-        )}
-
-        {/* Metas seleccionadas */}
-        {splits.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Distribución</Text>
-            {splits.map((item) => (
-              <Card key={item.goal.id} style={styles.splitCard}>
-                <View style={styles.splitHeader}>
-                  <View style={[styles.splitIcon, { backgroundColor: (item.goal.color ?? Colors.primary) + '20' }]}>
-                    <Ionicons name={item.goal.icon as any ?? 'wallet'} size={18} color={item.goal.color ?? Colors.primary} />
-                  </View>
-                  <Text style={styles.splitGoalName} numberOfLines={1}>{item.goal.name}</Text>
-                  <Pressable onPress={() => removeGoal(item.goal.id)} hitSlop={8}>
-                    <Ionicons name="close-circle" size={22} color={Colors.textLight} />
-                  </Pressable>
-                </View>
-                <TextInput
-                  style={styles.splitAmountInput}
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.textLight}
-                  keyboardType="decimal-pad"
-                  value={item.amount}
-                  onChangeText={(v) => updateAmount(item.goal.id, v)}
-                />
-              </Card>
-            ))}
+        {/* ─── SUMMARY CARD ─── */}
+        <View style={[S.SplitPanel.summaryCard, { marginBottom: Theme.space.lg }]}>
+          <View style={S.SplitPanel.summaryRow}>
+            <Text style={S.Typography.bodyMd}>Total ingresado</Text>
+            <Text style={S.Typography.amountMd}>{currency}{totalAmount.toLocaleString()}</Text>
           </View>
-        )}
-
-        {/* Agregar metas */}
-        {activeGoals.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Agregar metas</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.goalsScroll}>
-              {activeGoals.map((g) => (
-                <Pressable key={g.id} style={styles.goalChip} onPress={() => addGoal(g)}>
-                  <Ionicons name={g.icon as any ?? 'wallet'} size={16} color={g.color ?? Colors.primary} />
-                  <Text style={styles.goalChipText} numberOfLines={1}>{g.name}</Text>
-                  <Ionicons name="add-circle" size={18} color={Colors.primary} />
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Sobrante como libre */}
-        {leftover > 0 && !isOver && (
-          <Pressable style={styles.leftoverToggle} onPress={() => setLeftoverAsFree(!leftoverAsFree)}>
-            <View style={[styles.checkbox, leftoverAsFree && styles.checkboxActive]}>
-              {leftoverAsFree && <Ionicons name="checkmark" size={14} color={Colors.white} />}
-            </View>
-            <Text style={styles.leftoverToggleText}>
-              Guardar sobrante ({formatAmount(leftover, currency)}) como ahorro libre
+          <View style={S.SplitPanel.summaryRow}>
+            <Text style={S.Typography.bodyMd}>Total repartido</Text>
+            <Text style={[S.Typography.amountSm, isOver && { color: Theme.color.danger }]}>
+              {currency}{totalDistributed.toLocaleString()}
             </Text>
-          </Pressable>
+          </View>
+          <View style={S.SplitPanel.summaryRow}>
+            <Text style={S.Typography.bodyMd}>Pendiente</Text>
+            <Text style={[
+              S.Typography.amountSm,
+              isComplete ? { color: Theme.color.primary } :
+              isOver     ? { color: Theme.color.danger  } :
+                           { color: Theme.color.warning  },
+            ]}>
+              {isOver ? '−' : ''}{currency}{Math.abs(remaining).toLocaleString()}
+            </Text>
+          </View>
+
+          {/* Progress bar */}
+          <View style={{ marginTop: Theme.space.sm }}>
+            <ProgressBar
+              progress={progressRatio * 100}
+              color={isOver ? Theme.color.danger : Theme.color.primary}
+              size="md"
+            />
+          </View>
+
+          {isOver && (
+            <View style={S.SplitPanel.warningRow}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={14} color={Theme.color.danger} />
+              <Text style={S.SplitPanel.warningText}>
+                Excediste el monto por {currency}{(totalDistributed - totalAmount).toFixed(2)}. Ajusta los valores.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* ─── GOALS ─── */}
+        <Text style={[S.Typography.label, { marginBottom: Theme.space.sm }]}>Selecciona las metas</Text>
+
+        {AVAILABLE_GOALS.map(goal => {
+          const isSelected = selectedIds.includes(goal.id);
+          return (
+            <View
+              key={goal.id}
+              style={[S.SplitPanel.goalRow, isSelected && S.SplitPanel.goalRowActive]}
+            >
+              <TouchableOpacity
+                style={[S.Layout.row, { flex: 1, gap: 10 }]}
+                onPress={() => toggleGoal(goal.id)}
+                activeOpacity={0.7}
+              >
+                <View style={[
+                  S.SplitPanel.checkbox,
+                  isSelected && S.SplitPanel.checkboxActive,
+                ]}>
+                  {isSelected && <MaterialCommunityIcons name="check" size={12} color={Theme.color.white} />}
+                </View>
+                <View style={[S.IconWrap.free, { backgroundColor: goal.iconColor + '18' }]}>
+                  <MaterialCommunityIcons name={goal.icon as any} size={18} color={goal.iconColor} />
+                </View>
+                <View style={S.Layout.flex1}>
+                  <Text style={[S.Typography.headingSm, { fontSize: Theme.size.sm }]}>{goal.name}</Text>
+                  <Text style={S.Typography.bodySm}>{goal.currency}</Text>
+                </View>
+              </TouchableOpacity>
+
+              {isSelected && (
+                <View style={S.SplitPanel.assignInput}>
+                  <Text style={[S.Typography.label, { marginRight: 4 }]}>{goal.currency}</Text>
+                  <TextInput
+                    style={S.SplitPanel.assignInputText}
+                    placeholder="0.00"
+                    placeholderTextColor={Theme.color.textPlaceholder}
+                    value={goals.find(g => g.id === goal.id)?.assigned ?? ''}
+                    onChangeText={v => updateAssigned(goal.id, v)}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              )}
+            </View>
+          );
+        })}
+
+        {/* ─── FREE REMAINDER ─── */}
+        <View style={S.SplitPanel.goalRow}>
+          <View style={[S.Layout.row, { flex: 1, gap: 10 }]}>
+            <View style={S.IconWrap.free}>
+              <MaterialCommunityIcons name="piggy-bank-outline" size={18} color={Theme.color.primary} />
+            </View>
+            <View style={S.Layout.flex1}>
+              <Text style={[S.Typography.headingSm, { fontSize: Theme.size.sm }]}>Ahorro libre</Text>
+              <Text style={S.Typography.bodySm}>Guardar sobrante sin meta</Text>
+            </View>
+          </View>
+          <View style={S.SplitPanel.assignInput}>
+            <Text style={[S.Typography.label, { marginRight: 4 }]}>{currency}</Text>
+            <TextInput
+              style={S.SplitPanel.assignInputText}
+              placeholder="0.00"
+              placeholderTextColor={Theme.color.textPlaceholder}
+              value={freeAmount}
+              onChangeText={setFreeAmount}
+              keyboardType="decimal-pad"
+            />
+          </View>
+        </View>
+
+        {/* ─── QUICK FILL ─── */}
+        {remaining > 0 && (
+          <TouchableOpacity
+            style={S.SplitPanel.quickFillBtn}
+            activeOpacity={0.7}
+            onPress={() => setFreeAmount(remaining.toFixed(2))}
+          >
+            <MaterialCommunityIcons name="lightning-bolt" size={15} color={Theme.color.primaryDark} />
+            <Text style={S.SplitPanel.quickFillText}>
+              Agregar {currency}{remaining.toFixed(2)} como ahorro libre
+            </Text>
+          </TouchableOpacity>
         )}
 
-        {/* Nota */}
-        <Input label="Nota (opcional)" placeholder="¿De dónde viene este ahorro?" value={note} onChangeText={setNote} multiline />
+        {/* ─── CONFIRM ─── */}
+        <TouchableOpacity
+          style={[S.Buttons.primaryLg, (isOver || selectedIds.length === 0) && S.Buttons.disabled]}
+          activeOpacity={0.85}
+          disabled={isOver || selectedIds.length === 0}
+        >
+          <MaterialCommunityIcons name="check-circle-outline" size={20} color={Theme.color.white} />
+          <Text style={S.Buttons.primaryText}>Confirmar repartición</Text>
+        </TouchableOpacity>
 
-        <Button label="Repartir ahorro" variant="primary" loading={submitting} onPress={handleSubmit}
-          disabled={isOver || splits.length === 0 || total <= 0} style={styles.submitBtn} />
-
-        {isOver && (
-          <Text style={styles.errorMsg}>
-            El total repartido supera el monto disponible. Ajusta la distribución.
-          </Text>
-        )}
-        <View style={{ height: 40 }} />
+        <View style={{ height: Theme.space.xl }} />
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.backgroundMain },
-  header: { paddingTop: 60, paddingBottom: 28, paddingHorizontal: Spacing.screenHorizontal, gap: 4 },
-  backBtn: { marginBottom: Spacing[3] },
-  headerTitle: { fontFamily: FontFamily.soraBold, fontSize: FontSize.xl, color: Colors.white },
-  headerSub: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.7)' },
-  content: { padding: Spacing.screenHorizontal, paddingTop: Spacing[4] },
-  label: { fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.sm, color: Colors.textDark, marginBottom: Spacing[2] },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: Spacing[4] },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: BorderRadius.full, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.white },
-  chipSel: { borderColor: Colors.primary, backgroundColor: Colors.primary },
-  chipTxt: { fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.sm, color: Colors.textMedium },
-  chipTxtSel: { color: Colors.white },
-  progressCard: { marginBottom: Spacing[4], gap: Spacing[2] },
-  progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  progressLabel: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: Colors.textMedium },
-  progressValue: { fontFamily: FontFamily.soraSemiBold, fontSize: FontSize.base, color: Colors.textDark },
-  leftoverLabel: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: Colors.textLight },
-  leftoverValue: { fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.sm, color: Colors.primary },
-  section: { marginBottom: Spacing[4] },
-  sectionTitle: { fontFamily: FontFamily.dmSansSemiBold, fontSize: FontSize.base, color: Colors.textDark, marginBottom: Spacing[3] },
-  splitCard: { marginBottom: Spacing[2], gap: Spacing[3] },
-  splitHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing[2] },
-  splitIcon: { width: 36, height: 36, borderRadius: BorderRadius.sm, alignItems: 'center', justifyContent: 'center' },
-  splitGoalName: { flex: 1, fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.base, color: Colors.textDark },
-  splitAmountInput: { height: 44, borderWidth: 1.5, borderColor: Colors.border, borderRadius: BorderRadius.input, paddingHorizontal: 16, fontFamily: FontFamily.soraSemiBold, fontSize: FontSize.lg, color: Colors.textDark, backgroundColor: Colors.backgroundInput },
-  goalsScroll: { marginBottom: Spacing[2] },
-  goalChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: BorderRadius.lg, borderWidth: 1.5, borderColor: Colors.primaryLight, backgroundColor: Colors.white, marginRight: 10, maxWidth: 160, ...Shadows.xs },
-  goalChipText: { fontFamily: FontFamily.dmSansMedium, fontSize: FontSize.sm, color: Colors.textDark, flex: 1 },
-  leftoverToggle: { flexDirection: 'row', alignItems: 'center', gap: Spacing[3], backgroundColor: Colors.primarySoft, borderRadius: BorderRadius.md, padding: Spacing[4], marginBottom: Spacing[4], borderWidth: 1, borderColor: Colors.primaryLight },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Colors.border, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center' },
-  checkboxActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  leftoverToggleText: { flex: 1, fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: Colors.textDark, lineHeight: FontSize.sm * 1.5 },
-  submitBtn: { marginBottom: Spacing[3] },
-  errorMsg: { fontFamily: FontFamily.dmSansRegular, fontSize: FontSize.sm, color: Colors.danger, textAlign: 'center', marginBottom: Spacing[3] },
-});
+export default SplitSavingScreen;
